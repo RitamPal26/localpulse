@@ -1,98 +1,104 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function HomePage() {
+  const router = useRouter();
 
-export default function HomeScreen() {
+  const handleLogout = () => {
+    router.replace('/');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView className="flex-1 bg-slate-50">
+      <ScrollView>
+        {/* Header */}
+        <View className="bg-white px-6 py-4 shadow-sm">
+          <View className="flex-row justify-between items-center">
+            <View>
+              <Text className="text-2xl font-bold text-gray-800">
+                LocalPulse 📍
+              </Text>
+              <Text className="text-gray-600 mt-1">
+                Your neighborhood hub
+              </Text>
+            </View>
+            <TouchableOpacity 
+              className="bg-red-500 px-4 py-2 rounded-lg"
+              onPress={handleLogout}
+            >
+              <Text className="text-white font-semibold">Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* Content */}
+        <View className="p-6">
+          <View className="bg-blue-100 p-4 rounded-xl mb-6">
+            <Text className="text-blue-800 text-lg font-semibold mb-2">
+              🎉 Welcome to your community!
+            </Text>
+            <Text className="text-blue-700">
+              Discover local events, connect with neighbors, and explore your area.
+            </Text>
+          </View>
+
+          {/* Quick Actions Grid */}
+          <Text className="text-xl font-bold text-gray-800 mb-4">Quick Actions</Text>
+          
+          <View className="gap-4"> {/* ✅ Changed from space-y-4 */}
+            {/* Row 1 */}
+            <View className="flex-row gap-4"> {/* ✅ Changed from space-x-4 */}
+              <TouchableOpacity className="flex-1 bg-white p-4 rounded-xl shadow-sm">
+                <Text className="text-2xl mb-2">🗺️</Text>
+                <Text className="font-semibold text-gray-800">Explore</Text>
+                <Text className="text-xs text-gray-600">Find places</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity className="flex-1 bg-white p-4 rounded-xl shadow-sm">
+                <Text className="text-2xl mb-2">🏪</Text>
+                <Text className="font-semibold text-gray-800">Business</Text>
+                <Text className="text-xs text-gray-600">Local shops</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Row 2 */}
+            <View className="flex-row gap-4"> {/* ✅ Changed from space-x-4 */}
+              <TouchableOpacity className="flex-1 bg-white p-4 rounded-xl shadow-sm">
+                <Text className="text-2xl mb-2">📢</Text>
+                <Text className="font-semibold text-gray-800">Community</Text>
+                <Text className="text-xs text-gray-600">Updates</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity className="flex-1 bg-white p-4 rounded-xl shadow-sm">
+                <Text className="text-2xl mb-2">🤝</Text>
+                <Text className="font-semibold text-gray-800">Help</Text>
+                <Text className="text-xs text-gray-600">Services</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Stats */}
+          <View className="bg-blue-500 p-6 rounded-xl mt-6"> {/* ✅ Changed from gradient */}
+            <Text className="text-white text-lg font-bold mb-4">Your Impact</Text>
+            <View className="flex-row justify-between">
+              <View className="items-center">
+                <Text className="text-white text-2xl font-bold">12</Text>
+                <Text className="text-blue-100 text-xs">Events</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-white text-2xl font-bold">5</Text>
+                <Text className="text-blue-100 text-xs">Neighbors</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-white text-2xl font-bold">3</Text>
+                <Text className="text-blue-100 text-xs">Reviews</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
