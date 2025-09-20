@@ -1,20 +1,13 @@
-import { convexAdapter } from '@convex-dev/better-auth';
-import { convex } from '@convex-dev/better-auth/plugins';
-import { betterAuth } from 'better-auth';
-import { betterAuthComponent } from '../../convex/auth';
-import { type GenericCtx } from '../../convex/_generated/server';
+import { createAuthClient } from "better-auth/react";
+import { expoClient } from "@better-auth/expo/client";
+import * as SecureStore from "expo-secure-store";
 
-const siteUrl = process.env.SITE_URL || "http://localhost:8081";
-
-export const createAuth = (ctx: GenericCtx) =>
-  betterAuth({
-    baseURL: siteUrl,
-    database: convexAdapter(ctx, betterAuthComponent),
-    emailAndPassword: {
-      enabled: true,
-      requireEmailVerification: false
-    },
+export const authClient = createAuthClient({
+    baseURL: "https://giant-opossum-714.convex.site/api/auth", // Your Convex site URL
     plugins: [
-      convex()
+        expoClient({
+            scheme: "localpulse", // Should match your app.json scheme
+            storage: SecureStore,
+        })
     ]
-  });
+});
