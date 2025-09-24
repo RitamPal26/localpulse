@@ -1,28 +1,69 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Tabs } from 'expo-router';
+import { Tabs } from "expo-router";
+import { View } from "react-native";
 
-export default function TabsLayout() {
+export default function TabLayout() {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: 'blue' }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: "#007AFF",
+        tabBarInactiveTintColor: "#666",
+        tabBarStyle: {
+          backgroundColor: "#fff",
+          borderTopWidth: 1,
+          borderTopColor: "#eee",
+          height: 85,
+          paddingBottom: 20,
+          paddingTop: 10,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
+          title: "Home",
+          tabBarIcon: () => (
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                backgroundColor: "#007AFF",
+                borderRadius: 10,
+              }}
+            />
+          ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="collections"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="map" color={color} />,
+          title: "Collections",
+          tabBarIcon: () => (
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                backgroundColor: "#666",
+                borderRadius: 10,
+              }}
+            />
+          ),
         }}
       />
       <Tabs.Screen
-        name="community"
+        name="profile"
         options={{
-          title: 'Community',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="users" color={color} />,
+          title: "Profile",
+          tabBarIcon: () => (
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                backgroundColor: "#666",
+                borderRadius: 10,
+              }}
+            />
+          ),
         }}
       />
     </Tabs>

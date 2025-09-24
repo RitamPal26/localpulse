@@ -3,10 +3,10 @@ import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
 
 export const authClient = createAuthClient({
-    baseURL: "https://giant-opossum-714.convex.site/api/auth", // Your Convex site URL
+    baseURL: "https://giant-opossum-714.convex.site/api/auth", 
     plugins: [
         expoClient({
-            scheme: "localpulse", // Should match your app.json scheme
+            scheme: "localpulse", 
             storage: SecureStore,
         })
     ]

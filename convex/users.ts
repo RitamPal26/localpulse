@@ -1,7 +1,6 @@
-// convex/users.ts
+import { query, mutation } from "./_generated/server";
+import { ConvexError , v } from "convex/values";
 
-import { mutation } from "./_generated/server";
-import { ConvexError } from "convex/values";
 
 export const store = mutation({
   args: {},
@@ -32,9 +31,21 @@ export const store = mutation({
       name: identity.name!,
       email: identity.email!,
       tokenIdentifier: identity.tokenIdentifier,
-      //credits: 10, // Example: Give new users some credits
+      createdAt: Date.now(),
     });
 
     return newUser;
+  },
+});
+
+export const get = query({
+  args: { tokenIdentifier: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", args.tokenIdentifier)
+      )
+      .unique();
   },
 });
