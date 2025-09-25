@@ -15,37 +15,29 @@ import { MOCK_FEED_DATA } from "../../../src/constants/mockData";
 import { getPulseById } from "../../../src/constants/pulses";
 
 const SavedItemCard = ({ item, onRemove }) => {
-  // Find the mock data for this saved item
-  const feedItem = MOCK_FEED_DATA.find((feedItem) => feedItem.id === item);
-
-  if (!feedItem) return null; // Skip if mock data not found
-
+  // item is now a full object, not just an ID
   return (
-    <View style={[styles.itemCard, { borderLeftColor: feedItem.pulseColor }]}>
-      <View style={styles.itemHeader}>
-        <View style={styles.pulseInfo}>
-          <Text style={styles.pulseIcon}>{feedItem.pulseIcon}</Text>
-          <Text style={styles.pulseName}>
-            {getPulseById(feedItem.pulseId)?.name || feedItem.pulseId}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => onRemove(item)}
-        >
-          <Text style={styles.removeText}>×</Text>
-        </TouchableOpacity>
+    <View style={styles.itemCard}>
+      <View style={styles.itemContent}>
+        <Text style={styles.itemTitle}>{item.title}</Text>
+        <Text style={styles.itemLocation}>📍 {item.location}</Text>
+        {item.cuisine && (
+          <Text style={styles.itemCuisine}>🍽️ {item.cuisine}</Text>
+        )}
+        {item.rating && (
+          <Text style={styles.itemRating}>⭐ {item.rating.toFixed(1)}</Text>
+        )}
+        <Text style={styles.itemDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
       </View>
 
-      <Text style={styles.itemTitle}>{feedItem.title}</Text>
-      <Text style={styles.itemDescription} numberOfLines={2}>
-        {feedItem.description}
-      </Text>
-
-      <View style={styles.itemMeta}>
-        <Text style={styles.location}>📍 {feedItem.location}</Text>
-        <Text style={styles.timeAgo}>{feedItem.timeAgo}</Text>
-      </View>
+      <TouchableOpacity
+        style={styles.removeButton}
+        onPress={() => onRemove(item.id)}
+      >
+        <Text style={styles.removeButtonText}>×</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -66,7 +58,7 @@ const CollectionSection = ({
         <View>
           <Text style={styles.collectionName}>{collection.name}</Text>
           <Text style={styles.collectionCount}>
-            {collection.items?.length || 0} items
+            {collection.itemCount} items {/* FIXED: Use itemCount */}
           </Text>
         </View>
         <Text style={styles.expandIcon}>{expanded ? "▼" : "▶"}</Text>
@@ -74,14 +66,17 @@ const CollectionSection = ({
 
       {expanded && (
         <View style={styles.collectionItems}>
-          {(collection.items || []).map((itemId, index) => (
-            <SavedItemCard
-              key={`${collection._id}-${itemId}-${index}`}
-              item={itemId}
-              onRemove={(itemId) => onRemoveItem(collection._id, itemId)}
-            />
-          ))}
-          {(!collection.items || collection.items.length === 0) && (
+          {(collection.resolvedItems || []).map(
+            (item, index /* FIXED: Use resolvedItems */) => (
+              <SavedItemCard
+                key={`${collection._id}-${item.id}-${index}`}
+                item={item}
+                onRemove={(itemId) => onRemoveItem(collection._id, itemId)}
+              />
+            )
+          )}
+          {(!collection.resolvedItems ||
+            collection.resolvedItems.length === 0) && (
             <Text style={styles.emptyText}>No items saved yet</Text>
           )}
         </View>
@@ -91,10 +86,12 @@ const CollectionSection = ({
 };
 
 export default function CollectionsScreen() {
-  const collections = useQuery(api.collections.getUserCollections);
   const removeFromCollection = useMutation(
     api.collections.removeFromCollection
   );
+  const collections = useQuery(api.collections.getUserCollectionsWithItems);
+
+  console.log("Collections with items:", collections);
 
   const handleRemoveItem = async (collectionId, itemId) => {
     Alert.alert("Remove Item", "Are you sure you want to remove this item?", [

@@ -22,12 +22,12 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: () => (
+          tabBarIcon: ({ color }) => (
             <View
               style={{
                 width: 20,
                 height: 20,
-                backgroundColor: "#007AFF",
+                backgroundColor: color, // Use the color parameter!
                 borderRadius: 10,
               }}
             />
@@ -38,12 +38,12 @@ export default function TabLayout() {
         name="collections"
         options={{
           title: "Collections",
-          tabBarIcon: () => (
+          tabBarIcon: ({ color }) => (
             <View
               style={{
                 width: 20,
                 height: 20,
-                backgroundColor: "#666",
+                backgroundColor: color, // Use the color parameter!
                 borderRadius: 10,
               }}
             />
@@ -54,12 +54,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: () => (
+          tabBarIcon: ({ color }) => (
             <View
               style={{
                 width: 20,
                 height: 20,
-                backgroundColor: "#666",
+                backgroundColor: color, // Use the color parameter!
                 borderRadius: 10,
               }}
             />

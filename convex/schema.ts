@@ -25,9 +25,25 @@ export default defineSchema({
     source: v.string(),
     sourceUrl: v.string(),
     scrapedAt: v.number(),
-    location: v.optional(v.string()),
+    location: v.optional(v.string()), // Keep this - human readable
+    contentType: v.string(),
+
+    // Restaurant specific
+    cuisine: v.optional(v.string()),
+    priceRange: v.optional(v.string()),
+    rating: v.optional(v.number()),
+
+    // Event specific
+    eventDate: v.optional(v.string()),
+    venue: v.optional(v.string()),
+
+    // AI enhanced description
+    aiSummary: v.optional(v.string()),
+
     tags: v.array(v.string()),
-  }).index("by_pulse", ["pulseId"]),
+  })
+    .index("by_pulse", ["pulseId"])
+    .index("by_content_type", ["contentType"]),
 
   // User's saved collections
   collections: defineTable({

@@ -129,3 +129,104 @@ export const removeFromCollection = mutation({
     });
   },
 });
+
+// Add this new query to get collections with resolved items
+export const getUserCollectionsWithItems = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+
+    if (!user) return [];
+
+    const collections = await ctx.db
+      .query("collections")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get all pulse content to resolve item IDs
+    const allContent = await ctx.db.query("pulseContent").collect();
+
+    // Helper function to transform pulse content to display format
+    const transformItem = (item) => ({
+      id: item._id,
+      pulseId: item.pulseId,
+      title: item.title,
+      description: item.aiSummary || item.description,
+      source: item.source,
+      sourceUrl: item.sourceUrl,
+      scrapedAt: item.scrapedAt,
+      location: item.location,
+      tags: item.tags,
+      pulseIcon: getPulseIcon(item.pulseId),
+      pulseColor: getPulseColor(item.pulseId),
+      timeAgo: getTimeAgo(item.scrapedAt),
+      contentType: item.contentType,
+      cuisine: item.cuisine,
+      priceRange: item.priceRange,
+      rating: item.rating,
+    });
+
+    // Resolve item IDs to actual items for each collection
+    return collections.map((collection) => ({
+      _id: collection._id,
+      name: collection.name,
+      description: collection.description,
+      createdAt: collection.createdAt,
+      updatedAt: collection.updatedAt,
+      itemCount: collection.items?.length || 0,
+      // Resolve items from IDs
+      resolvedItems: (collection.items || [])
+        .map((itemId) => {
+          const pulseItem = allContent.find(
+            (content) => content._id.toString() === itemId
+          );
+          return pulseItem ? transformItem(pulseItem) : null;
+        })
+        .filter((item) => item !== null), // Remove null items
+    }));
+  },
+});
+
+// Keep the helper functions at the bottom (copy from pulses.ts)
+function getPulseIcon(pulseId: string): string {
+  const icons = {
+    restaurants: "🍽️",
+    events: "🎉",
+    "tech-meetups": "💻",
+    "local-news": "📰",
+    apartments: "🏠",
+  };
+  return icons[pulseId] || "📍";
+}
+
+function getPulseColor(pulseId: string): string {
+  const colors = {
+    restaurants: "#FF6B6B",
+    events: "#4ECDC4",
+    "tech-meetups": "#FFEAA7",
+    "local-news": "#45B7D1",
+    apartments: "#96CEB4",
+  };
+  return colors[pulseId] || "#888888";
+}
+
+function getTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  return `${days} day${days > 1 ? "s" : ""} ago`;
+}

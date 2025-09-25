@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,8 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { MOCK_FEED_DATA } from "../../../src/constants/mockData";
 import { getPulseById } from "../../../src/constants/pulses";
 import { ShareModal } from "../../../src/components/ShareModal";
 
@@ -38,6 +37,19 @@ const FeedCard = ({ item, onSave, onShare }) => {
         <Text style={styles.source}>via {item.source}</Text>
       </View>
 
+      {/* Additional restaurant info */}
+      {item.cuisine && (
+        <View style={styles.additionalInfo}>
+          <Text style={styles.cuisine}>🍽️ {item.cuisine}</Text>
+          {item.rating && (
+            <Text style={styles.rating}>⭐ {item.rating.toFixed(1)}</Text>
+          )}
+          {item.priceRange && (
+            <Text style={styles.priceRange}>{item.priceRange}</Text>
+          )}
+        </View>
+      )}
+
       {/* Actions */}
       <View style={styles.actions}>
         <TouchableOpacity
@@ -60,52 +72,86 @@ const FeedCard = ({ item, onSave, onShare }) => {
 export default function HomeScreen() {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [itemToShare, setItemToShare] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const saveToCollection = useMutation(api.collections.saveToCollection);
+  const populateContent = useAction(api.dataIngestion.populateFeedContent);
 
-  const userPulses = useQuery(api.pulses.getUserPulsePreferences);
+  // Use real data from your database
+  const feedData = useQuery(api.pulses.getFeedContent);
+  const contentStats = useQuery(api.pulses.getContentStats);
 
-  // Filter mock data based on user's selected pulses
-  const filteredFeed = MOCK_FEED_DATA.filter(
-    (item) => userPulses?.selectedPulses?.includes(item.pulseId) || !userPulses
-  );
+  const rawFeedData = useQuery(api.pulses.getRawFeedContent);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await populateContent({});
+    } catch (error) {
+      console.error("Refresh error:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSave = async (item) => {
     try {
+      console.log("Saving item with ID:", item.id); // Debug log
+
       await saveToCollection({
-        itemId: item.id,
+        itemId: item.id, // This should be the _id from the database
         collectionName: "Saved Items",
       });
-      // Show success feedback
       console.log("Saved:", item.title);
-      // TODO: Add toast/alert for user feedback
+      // TODO: Add success feedback
     } catch (error) {
       console.error("Error saving:", error);
     }
   };
 
   const handleShare = (item) => {
-    const itemWithPulseName = {
-      ...item,
-      pulseName: getPulseById(item.pulseId)?.name || item.pulseId,
-    };
-    setItemToShare(itemWithPulseName);
+    setItemToShare(item);
     setShareModalVisible(true);
   };
 
-  const renderItem = ({ item }) => (
-    <FeedCard item={item} onSave={handleSave} onShare={handleShare} />
-  );
+  // Use the real feed data
+  const displayFeed = feedData || [];
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with stats */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>LocalPulse</Text>
-        <Text style={styles.headerSubtitle}>
-          {userPulses?.selectedPulses?.length || 0} pulses active
-        </Text>
+        {contentStats && (
+          <Text style={styles.statsText}>
+            📊 {contentStats.total} discoveries available
+          </Text>
+        )}
       </View>
 
+      {/* Feed */}
+      <FlatList
+        data={displayFeed}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <FeedCard item={item} onSave={handleSave} onShare={handleShare} />
+        )}
+        contentContainerStyle={styles.feedContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>
+              {feedData === undefined
+                ? "Loading discoveries..."
+                : "No content available. Pull to refresh!"}
+            </Text>
+          </View>
+        )}
+      />
+
+      {/* Share Modal */}
       <ShareModal
         visible={shareModalVisible}
         item={itemToShare}
@@ -113,17 +159,6 @@ export default function HomeScreen() {
           setShareModalVisible(false);
           setItemToShare(null);
         }}
-      />
-
-      <FlatList
-        data={filteredFeed}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        style={styles.feed}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={false} onRefresh={() => {}} />
-        }
       />
     </SafeAreaView>
   );
@@ -135,37 +170,35 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "white",
+    padding: 20,
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#e9ecef",
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#1a1a1a",
+    color: "#333",
   },
-  headerSubtitle: {
+  statsText: {
     fontSize: 14,
     color: "#666",
-    marginTop: 2,
+    marginTop: 4,
   },
-  feed: {
-    flex: 1,
+  feedContainer: {
+    padding: 16,
   },
   card: {
-    backgroundColor: "white",
-    marginHorizontal: 16,
-    marginVertical: 8,
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
+    marginBottom: 16,
     borderLeftWidth: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: "row",
@@ -179,57 +212,88 @@ const styles = StyleSheet.create({
   },
   pulseIcon: {
     fontSize: 16,
-    marginRight: 6,
+    marginRight: 8,
   },
   pulseName: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#007AFF",
+    color: "#666",
   },
   timeAgo: {
     fontSize: 12,
     color: "#999",
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1a1a1a",
-    marginBottom: 4,
-    lineHeight: 22,
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
   },
   cardDescription: {
     fontSize: 14,
-    color: "#333",
+    color: "#666",
     lineHeight: 20,
     marginBottom: 12,
   },
   metaInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: 8,
   },
   location: {
     fontSize: 12,
-    color: "#666",
+    color: "#888",
   },
   source: {
     fontSize: 12,
-    color: "#666",
+    color: "#888",
     fontStyle: "italic",
+  },
+  additionalInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    flexWrap: "wrap",
+  },
+  cuisine: {
+    fontSize: 12,
+    color: "#666",
+    marginRight: 12,
+  },
+  rating: {
+    fontSize: 12,
+    color: "#666",
+    marginRight: 12,
+  },
+  priceRange: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "bold",
   },
   actions: {
     flexDirection: "row",
+    justifyContent: "flex-end",
     gap: 12,
   },
   actionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#f0f0f0",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#007AFF",
     borderRadius: 6,
   },
   actionText: {
+    color: "#fff",
     fontSize: 12,
-    fontWeight: "500",
-    color: "#333",
+    fontWeight: "600",
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
   },
 });
