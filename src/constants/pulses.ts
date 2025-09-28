@@ -2,7 +2,7 @@ import { PulseType } from '../types';
 
 export const AVAILABLE_PULSES: PulseType[] = [
   {
-    id: 'restaurants',
+    id: 'restaurants',        // ✅ Keep same
     name: 'New Restaurants',
     description: 'Fresh dining spots, hidden gems & food reviews',
     icon: '🍽️',
@@ -11,7 +11,7 @@ export const AVAILABLE_PULSES: PulseType[] = [
     category: 'food'
   },
   {
-    id: 'events',
+    id: 'weekend-events',     // ← CHANGE FROM 'events' to 'weekend-events'
     name: 'Weekend Events',
     description: 'Concerts, markets, festivals & local happenings',
     icon: '🎉',
@@ -20,7 +20,7 @@ export const AVAILABLE_PULSES: PulseType[] = [
     category: 'events'
   },
   {
-    id: 'local-news',
+    id: 'local-news',         // ✅ Keep same
     name: 'Local News',
     description: 'Chennai city updates, infrastructure & community news',
     icon: '📰',
@@ -29,7 +29,7 @@ export const AVAILABLE_PULSES: PulseType[] = [
     category: 'news'
   },
   {
-    id: 'apartments',
+    id: 'apartment-hunt',     // ← CHANGE FROM 'apartments' to 'apartment-hunt'
     name: 'Apartment Hunt',
     description: 'New listings, rental deals & housing updates',
     icon: '🏠',
@@ -38,7 +38,7 @@ export const AVAILABLE_PULSES: PulseType[] = [
     category: 'housing'
   },
   {
-    id: 'tech-meetups',
+    id: 'tech-meetups',       // ✅ Keep same
     name: 'Tech Meetups',
     description: 'Developer events, startup news & tech community',
     icon: '💻',

@@ -7,15 +7,20 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  ToastAndroid,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "convex/react";
+import * as Haptics from "expo-haptics"; // ← ADD THIS IMPORT
 import { api } from "../../../convex/_generated/api";
 import { MOCK_FEED_DATA } from "../../../src/constants/mockData";
 import { getPulseById } from "../../../src/constants/pulses";
 
-const SavedItemCard = ({ item, onRemove }) => {
-  // item is now a full object, not just an ID
+const SavedItemCard = ({ item, onRemove, removalStatus }) => {
+  const statusKey = `${item.collectionId}-${item.id}`;
+  const status = removalStatus[statusKey] || null;
+
   return (
     <View style={styles.itemCard}>
       <View style={styles.itemContent}>
@@ -30,23 +35,36 @@ const SavedItemCard = ({ item, onRemove }) => {
         <Text style={styles.itemDescription} numberOfLines={2}>
           {item.description}
         </Text>
+
+        {/* Status indicators */}
+        {status === "removing" && (
+          <Text style={styles.statusText}>Removing...</Text>
+        )}
+        {status === "success" && (
+          <Text style={styles.successText}>✓ Removed!</Text>
+        )}
+        {status === "error" && (
+          <Text style={styles.errorText}>❌ Failed to remove</Text>
+        )}
       </View>
 
       <TouchableOpacity
-        style={styles.removeButton}
+        style={[
+          styles.removeButton,
+          status === "removing" && styles.disabledButton,
+        ]}
         onPress={() => onRemove(item.id)}
+        disabled={status === "removing"}
       >
-        <Text style={styles.removeButtonText}>×</Text>
+        <Text style={styles.removeButtonText}>
+          {status === "removing" ? "..." : "×"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-const CollectionSection = ({
-  collection,
-  onRemoveItem,
-  onDeleteCollection,
-}) => {
+const CollectionSection = ({ collection, onRemoveItem, removalStatus }) => {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -58,7 +76,7 @@ const CollectionSection = ({
         <View>
           <Text style={styles.collectionName}>{collection.name}</Text>
           <Text style={styles.collectionCount}>
-            {collection.itemCount} items {/* FIXED: Use itemCount */}
+            {collection.resolvedItems?.length || 0} items
           </Text>
         </View>
         <Text style={styles.expandIcon}>{expanded ? "▼" : "▶"}</Text>
@@ -66,15 +84,14 @@ const CollectionSection = ({
 
       {expanded && (
         <View style={styles.collectionItems}>
-          {(collection.resolvedItems || []).map(
-            (item, index /* FIXED: Use resolvedItems */) => (
-              <SavedItemCard
-                key={`${collection._id}-${item.id}-${index}`}
-                item={item}
-                onRemove={(itemId) => onRemoveItem(collection._id, itemId)}
-              />
-            )
-          )}
+          {(collection.resolvedItems || []).map((item, index) => (
+            <SavedItemCard
+              key={`${collection._id}-${item.id}-${index}`}
+              item={{ ...item, collectionId: collection._id }}
+              onRemove={(itemId) => onRemoveItem(collection._id, itemId)}
+              removalStatus={removalStatus}
+            />
+          ))}
           {(!collection.resolvedItems ||
             collection.resolvedItems.length === 0) && (
             <Text style={styles.emptyText}>No items saved yet</Text>
@@ -91,6 +108,9 @@ export default function CollectionsScreen() {
   );
   const collections = useQuery(api.collections.getUserCollectionsWithItems);
 
+  // State for tracking removal status
+  const [removalStatus, setRemovalStatus] = useState({});
+
   console.log("Collections with items:", collections);
 
   const handleRemoveItem = async (collectionId, itemId) => {
@@ -100,12 +120,48 @@ export default function CollectionsScreen() {
         text: "Remove",
         style: "destructive",
         onPress: async () => {
+          const statusKey = `${collectionId}-${itemId}`;
+
           try {
+            // Set removing status
+            setRemovalStatus((prev) => ({ ...prev, [statusKey]: "removing" }));
+
             await removeFromCollection({ collectionId, itemId });
             console.log("Item removed successfully");
+
+            // ✅ Success feedback with haptics
+            setRemovalStatus((prev) => ({ ...prev, [statusKey]: "success" }));
+            await Haptics.notificationAsync(
+              Haptics.NotificationFeedbackType.Success
+            );
+
+            // Clear status after 2 seconds
+            setTimeout(() => {
+              setRemovalStatus((prev) => {
+                const updated = { ...prev };
+                delete updated[statusKey];
+                return updated;
+              });
+            }, 2000);
           } catch (error) {
             console.error("Error removing item:", error);
+
+            // ❌ Error feedback with haptics
+            setRemovalStatus((prev) => ({ ...prev, [statusKey]: "error" }));
+            await Haptics.notificationAsync(
+              Haptics.NotificationFeedbackType.Error
+            );
+
             Alert.alert("Error", "Failed to remove item");
+
+            // Clear error status after 3 seconds
+            setTimeout(() => {
+              setRemovalStatus((prev) => {
+                const updated = { ...prev };
+                delete updated[statusKey];
+                return updated;
+              });
+            }, 3000);
           }
         },
       },
@@ -113,8 +169,16 @@ export default function CollectionsScreen() {
   };
 
   const handleDeleteCollection = (collectionId) => {
-    // TODO: Implement collection deletion if needed
-    Alert.alert("Info", "Collection deletion coming soon!");
+    Alert.alert("Info", "Collection deletion coming soon!", [
+      {
+        text: "OK",
+        onPress: async () => {
+          await Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Warning
+          );
+        },
+      },
+    ]);
   };
 
   if (collections === undefined) {
@@ -154,7 +218,7 @@ export default function CollectionsScreen() {
               key={collection._id}
               collection={collection}
               onRemoveItem={handleRemoveItem}
-              onDeleteCollection={handleDeleteCollection}
+              removalStatus={removalStatus}
             />
           ))}
         </ScrollView>
@@ -163,6 +227,7 @@ export default function CollectionsScreen() {
   );
 }
 
+// Add missing styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -254,72 +319,79 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   itemCard: {
+    flexDirection: "row",
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
-    borderLeftWidth: 4,
   },
-  itemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  pulseInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  pulseIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  pulseName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#ff4444",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  removeText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+  itemContent: {
+    flex: 1,
   },
   itemTitle: {
     fontSize: 15,
     fontWeight: "600",
     color: "#1a1a1a",
     marginBottom: 4,
-    lineHeight: 20,
+  },
+  itemLocation: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 2,
+  },
+  itemCuisine: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 2,
+  },
+  itemRating: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
   },
   itemDescription: {
     fontSize: 13,
     color: "#333",
     lineHeight: 18,
-    marginBottom: 8,
   },
-  itemMeta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  removeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#ff4444",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
   },
-  location: {
-    fontSize: 11,
-    color: "#666",
-  },
-  timeAgo: {
-    fontSize: 11,
-    color: "#999",
+  removeButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   emptyText: {
     padding: 16,
     textAlign: "center",
     color: "#999",
     fontStyle: "italic",
+  },
+  statusText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+    marginTop: 4,
+  },
+  successText: {
+    fontSize: 12,
+    color: "#22C55E",
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#EF4444",
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
 });

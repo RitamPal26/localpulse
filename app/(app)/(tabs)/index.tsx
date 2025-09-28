@@ -12,6 +12,8 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { getPulseById } from "../../../src/constants/pulses";
 import { ShareModal } from "../../../src/components/ShareModal";
+import * as Haptics from "expo-haptics";
+
 
 const FeedCard = ({ item, onSave, onShare }) => {
   return (
@@ -74,6 +76,8 @@ export default function HomeScreen() {
   const [itemToShare, setItemToShare] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [saveStatus, setSaveStatus] = useState(null);
+
   const saveToCollection = useMutation(api.collections.saveToCollection);
   const populateContent = useAction(api.dataIngestion.populateFeedContent);
 
@@ -96,16 +100,27 @@ export default function HomeScreen() {
 
   const handleSave = async (item) => {
     try {
-      console.log("Saving item with ID:", item.id); // Debug log
+      console.log("Saving item with ID:", item.id);
+      setSaveStatus("saving");
 
       await saveToCollection({
-        itemId: item.id, // This should be the _id from the database
+        itemId: item.id,
         collectionName: "Saved Items",
       });
+
       console.log("Saved:", item.title);
-      // TODO: Add success feedback
+
+      // ✅ Success feedback with haptics
+      setSaveStatus("success");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Clear after 2 seconds
+      setTimeout(() => setSaveStatus(null), 2000);
     } catch (error) {
       console.error("Error saving:", error);
+      setSaveStatus("error");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setTimeout(() => setSaveStatus(null), 3000);
     }
   };
 
