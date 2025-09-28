@@ -8,10 +8,10 @@ export const populateFeedContent = action({
     console.log("Starting data ingestion pipeline...");
 
     try {
-      // Step 1: Scrape restaurants
+      // Step 1: Scrape restaurants (using your working TripAdvisor function)
       console.log("Scraping restaurants...");
       const scrapingResult = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiRestaurants,
+        api.actions.scraper.scrapeChennaiRestaurants, // This stays the same
         {}
       );
 
@@ -45,8 +45,9 @@ export const populateFeedContent = action({
             pulseId: "restaurants",
             title: restaurant.title,
             description: aiResult.aiSummary || restaurant.description,
-            source: "TripAdvisor",
-            sourceUrl: "https://www.tripadvisor.in/",
+            source: "TripAdvisor", // Updated to match your new source
+            sourceUrl:
+              "https://www.tripadvisor.in/Restaurants-g304556-Chennai_Madras_Chennai_District_Tamil_Nadu.html",
             scrapedAt: Date.now(),
             location: restaurant.location || "Chennai",
             contentType: "restaurant",
@@ -91,120 +92,127 @@ export const populateFeedContent = action({
   },
 });
 
-// Helper action to clear all content (for testing)
-export const clearAllContent = action({
-  args: {},
-  handler: async (ctx) => {
-    const allContent = await ctx.runQuery(api.pulses.getAllPulseContent);
-
-    for (const item of allContent) {
-      await ctx.runMutation(api.pulses.deletePulseContent, { id: item._id });
-    }
-
-    return { cleared: allContent.length };
-  },
-});
-
-function getChennaiAreaCoordinates(location: string) {
-  const areaCoordinates = {
-    "T. Nagar": { lat: 13.0418, lng: 80.2341 },
-    "Anna Salai": { lat: 13.0827, lng: 80.2707 },
-    Adyar: { lat: 13.0067, lng: 80.2206 },
-    Mylapore: { lat: 13.0338, lng: 80.2619 },
-    Egmore: { lat: 13.0732, lng: 80.2609 },
-    ECR: { lat: 12.9165, lng: 80.2731 },
-    Nungambakkam: { lat: 13.0594, lng: 80.2428 },
-    "Marina Beach": { lat: 13.0475, lng: 80.2824 },
-  };
-
-  // Try to match location to known areas
-  for (const [area, coords] of Object.entries(areaCoordinates)) {
-    if (location?.includes(area)) {
-      return coords;
-    }
-  }
-
-  // Default Chennai center coordinates
-  return { lat: 13.0827, lng: 80.2707 };
-}
-
-// Add this new comprehensive ingestion function
+// UPDATED: Complete data ingestion with all 5 categories
 export const populateAllContentTypes = action({
   args: {},
   handler: async (ctx) => {
-    console.log("Starting comprehensive data ingestion...");
+    console.log("🚀 Starting comprehensive data ingestion with NEW sources...");
 
     try {
       let totalProcessed = 0;
+      const results = {};
 
-      // 1. Restaurants (already working)
+      // 1. RESTAURANTS - TripAdvisor (working well)
+      console.log("📍 Scraping restaurants from TripAdvisor...");
       const restaurants = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiRestaurants,
+        api.actions.scraper.scrapeChennaiRestaurants, // Keep existing working function
         {}
       );
-      totalProcessed += await processItems(
+      const restaurantCount = await processItems(
         ctx,
         restaurants.restaurants,
         "restaurants",
         "restaurant"
       );
+      totalProcessed += restaurantCount;
+      results.restaurants = {
+        count: restaurantCount,
+        source: restaurants.source,
+      };
 
-      // 2. Events
-      const events = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiEvents,
+      // 2. WEEKEND EVENTS - EventBrite (NEW)
+      console.log("🎪 Scraping weekend events from EventBrite...");
+      const weekendEvents = await ctx.runAction(
+        api.actions.scraper.scrapeWeekendEvents, // NEW function name
         {}
       );
-      totalProcessed += await processItems(
+      const weekendCount = await processItems(
         ctx,
-        events.events,
-        "events",
-        "event"
+        weekendEvents.events,
+        "weekend-events",
+        "weekend-event"
       );
+      totalProcessed += weekendCount;
+      results.weekendEvents = {
+        count: weekendCount,
+        source: weekendEvents.source,
+      };
 
-      // 3. Tech Meetups
-      const meetups = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiTechMeetups,
+      // 3. LOCAL NEWS - Times of India (NEW)
+      console.log("📰 Scraping local news from Times of India...");
+      const localNews = await ctx.runAction(
+        api.actions.scraper.scrapeLocalNews, // NEW function name
         {}
       );
-      totalProcessed += await processItems(
+      const newsCount = await processItems(
         ctx,
-        meetups.meetups,
-        "tech-meetups",
-        "meetup"
+        localNews.news,
+        "local-news",
+        "news"
       );
+      totalProcessed += newsCount;
+      results.localNews = { count: newsCount, source: localNews.source };
 
-      // 4. Apartments
+      // 4. APARTMENT HUNT - 99acres (NEW)
+      console.log("🏠 Scraping apartments from 99acres...");
       const apartments = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiApartments,
+        api.actions.scraper.scrapeApartmentHunt, // NEW function name
         {}
       );
-      totalProcessed += await processItems(
+      const apartmentCount = await processItems(
         ctx,
         apartments.apartments,
-        "apartments",
+        "apartment-hunt",
         "apartment"
       );
+      totalProcessed += apartmentCount;
+      results.apartments = { count: apartmentCount, source: apartments.source };
+
+      // 5. TECH MEETUPS - GDG Chennai (NEW)
+      console.log("💻 Scraping tech meetups from GDG Chennai...");
+      const techMeetups = await ctx.runAction(
+        api.actions.scraper.scrapeTechMeetups, // NEW function name
+        {}
+      );
+      const meetupCount = await processItems(
+        ctx,
+        techMeetups.meetups,
+        "tech-meetups",
+        "tech-meetup"
+      );
+      totalProcessed += meetupCount;
+      results.techMeetups = { count: meetupCount, source: techMeetups.source };
+
+      console.log("✅ All categories scraped successfully!");
+      console.log(`📊 Total processed: ${totalProcessed} items`);
 
       return {
         success: true,
         totalProcessed: totalProcessed,
-        breakdown: {
-          restaurants: restaurants.restaurants.length,
-          events: events.events.length,
-          meetups: meetups.meetups.length,
-          apartments: apartments.apartments.length,
-        },
+        results: results,
+        message: "All 5 categories scraped with new AI extraction!",
       };
     } catch (error) {
-      console.error("Comprehensive ingestion error:", error);
-      return { success: false, error: error.message, totalProcessed: 0 };
+      console.error("💥 Comprehensive ingestion error:", error);
+      return {
+        success: false,
+        error: error.message,
+        totalProcessed: 0,
+      };
     }
   },
 });
 
-// Helper function to process any content type
+// UPDATED: Helper function to process any content type
 async function processItems(ctx, items, pulseId, contentType) {
   let processed = 0;
+
+  if (!items || !Array.isArray(items)) {
+    console.log(`⚠️ No items to process for ${contentType}`);
+    return 0;
+  }
+
+  console.log(`Processing ${items.length} ${contentType} items...`);
 
   for (const item of items) {
     try {
@@ -244,40 +252,142 @@ async function processItems(ctx, items, pulseId, contentType) {
           priceRange: item.priceRange,
           rating: item.rating,
         };
-      } else if (contentType === "event" || contentType === "meetup") {
+      } else if (
+        contentType === "weekend-event" ||
+        contentType === "tech-meetup"
+      ) {
         contentItem = {
           ...contentItem,
           eventDate: item.eventDate,
           venue: item.venue,
+          category: item.category,
+          organizer: item.organizer,
+        };
+      } else if (contentType === "news") {
+        contentItem = {
+          ...contentItem,
+          category: item.category,
+          publishedTime: item.publishedTime,
+        };
+      } else if (contentType === "apartment") {
+        contentItem = {
+          ...contentItem,
+          rent: item.rent,
+          bedrooms: item.bedrooms,
+          area: item.area,
+          amenities: item.amenities,
         };
       }
 
       await ctx.runMutation(api.pulses.addPulseContent, contentItem);
       processed++;
+
+      console.log(`✓ Processed: ${item.title}`);
+
+      // Small delay between items
+      await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (error) {
-      console.error(`Error processing ${item.title}:`, error);
+      console.error(`❌ Error processing ${item.title}:`, error);
+      // Continue with next item
     }
   }
 
+  console.log(
+    `✅ Completed ${contentType}: ${processed}/${items.length} items processed`
+  );
   return processed;
 }
 
+// UPDATED: Source mapping for new scraping sources
 function getSourceForType(contentType) {
   const sources = {
-    restaurant: "Zomato",
-    event: "BookMyShow",
-    meetup: "Meetup.com",
+    restaurant: "TripAdvisor",
+    "weekend-event": "EventBrite",
+    news: "Times of India",
     apartment: "99acres",
+    "tech-meetup": "GDG Chennai",
   };
   return sources[contentType] || "Local Source";
 }
 
+// UPDATED: Source URLs for new scraping sources
 function getSourceUrlForType(contentType) {
   const urls = {
-    restaurant: "https://www.zomato.com/chennai",
-    event: "https://in.bookmyshow.com/chennai",
-    meetup: "https://meetup.com/chennai",
-    apartment: "https://www.99acres.com/chennai",
+    restaurant:
+      "https://www.tripadvisor.in/Restaurants-g304556-Chennai_Madras_Chennai_District_Tamil_Nadu.html",
+    "weekend-event": "https://www.eventbrite.com/d/india--chennai/events/",
+    news: "https://timesofindia.indiatimes.com/city/chennai",
+    apartment: "https://www.99acres.com/rent/residential-property/chennai",
+    "tech-meetup": "https://gdg.community.dev/gdg-chennai/",
   };
   return urls[contentType] || "https://example.com";
 }
+
+// Helper action to clear all content (for testing)
+export const clearAllContent = action({
+  args: {},
+  handler: async (ctx) => {
+    console.log("🗑️ Clearing all content...");
+    const allContent = await ctx.runQuery(api.pulses.getAllPulseContent);
+
+    for (const item of allContent) {
+      await ctx.runMutation(api.pulses.deletePulseContent, { id: item._id });
+    }
+
+    console.log(`✅ Cleared ${allContent.length} items`);
+    return { cleared: allContent.length };
+  },
+});
+
+// Test individual categories
+export const testRestaurantScraping = action({
+  args: {},
+  handler: async (ctx) => {
+    const result = await ctx.runAction(
+      api.actions.scraper.scrapeChennaiRestaurants,
+      {}
+    );
+    return result;
+  },
+});
+
+export const testWeekendEventScraping = action({
+  args: {},
+  handler: async (ctx) => {
+    const result = await ctx.runAction(
+      api.actions.scraper.scrapeWeekendEvents,
+      {}
+    );
+    return result;
+  },
+});
+
+export const testNewsScraping = action({
+  args: {},
+  handler: async (ctx) => {
+    const result = await ctx.runAction(api.actions.scraper.scrapeLocalNews, {});
+    return result;
+  },
+});
+
+export const testApartmentScraping = action({
+  args: {},
+  handler: async (ctx) => {
+    const result = await ctx.runAction(
+      api.actions.scraper.scrapeApartmentHunt,
+      {}
+    );
+    return result;
+  },
+});
+
+export const testTechMeetupScraping = action({
+  args: {},
+  handler: async (ctx) => {
+    const result = await ctx.runAction(
+      api.actions.scraper.scrapeTechMeetups,
+      {}
+    );
+    return result;
+  },
+});

@@ -233,16 +233,27 @@ export const addPulseContent = mutation({
     description: v.string(),
     source: v.string(),
     sourceUrl: v.string(),
-    scrapedAt: v.number(),
+    scrapedAt: v.float64(),  // ← Must be float64, not number
     location: v.optional(v.string()),
     contentType: v.string(),
     cuisine: v.optional(v.string()),
     priceRange: v.optional(v.string()),
-    rating: v.optional(v.number()),
+    rating: v.optional(v.float64()),  // ← Must be float64
     eventDate: v.optional(v.string()),
     venue: v.optional(v.string()),
     aiSummary: v.optional(v.string()),
     tags: v.array(v.string()),
+    
+    // ADD ALL THESE MISSING FIELDS:
+    category: v.optional(v.string()), 
+    organizer: v.optional(v.string()),
+    ticketPrice: v.optional(v.string()),
+    publishedTime: v.optional(v.string()),
+    rent: v.optional(v.string()),
+    bedrooms: v.optional(v.string()), 
+    area: v.optional(v.string()),     // ← This was missing and causing errors
+    amenities: v.optional(v.string()),
+    furnishing: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("pulseContent", args);
@@ -290,10 +301,10 @@ export const getContentStats = query({
 function getPulseIcon(pulseId: string): string {
   const icons = {
     restaurants: "🍽️",
-    events: "🎉",
+    "weekend-events": "🎪", // ← UPDATE THIS (was "events")
     "tech-meetups": "💻",
     "local-news": "📰",
-    apartments: "🏠",
+    "apartment-hunt": "🏠", // ← UPDATE THIS (was "apartments")
   };
   return icons[pulseId] || "📍";
 }
@@ -301,10 +312,10 @@ function getPulseIcon(pulseId: string): string {
 function getPulseColor(pulseId: string): string {
   const colors = {
     restaurants: "#FF6B6B",
-    events: "#4ECDC4",
+    "weekend-events": "#4ECDC4", // ← UPDATE THIS
     "tech-meetups": "#FFEAA7",
     "local-news": "#45B7D1",
-    apartments: "#96CEB4",
+    "apartment-hunt": "#96CEB4", // ← UPDATE THIS
   };
   return colors[pulseId] || "#888888";
 }

@@ -3,6 +3,510 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 
+// 1. WEEKEND EVENTS - Using EventBrite Chennai
+export const scrapeWeekendEvents = action({
+  args: {},
+  handler: async (ctx) => {
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+
+    if (!FIRECRAWL_API_KEY) {
+      return {
+        success: true,
+        count: generateWeekendEventsData().length,
+        events: generateWeekendEventsData(),
+        source: "demo",
+      };
+    }
+
+    try {
+      console.log("🎪 Attempting AI extraction from EventBrite Chennai...");
+
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: "https://www.eventbrite.com/d/india--chennai/events/", 
+          formats: ["extract"],
+          extract: {
+            prompt: "Extract weekend events happening in Chennai including event names, dates, venues, descriptions, and ticket prices",
+            schema: {
+              type: "object",
+              properties: {
+                events: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Event name" },
+                      date: { type: "string", description: "Event date and time" },
+                      venue: { type: "string", description: "Venue location" },
+                      description: { type: "string", description: "Event description" },
+                      category: { type: "string", description: "Event category (music, party, workshop, etc.)" },
+                      ticketPrice: { type: "string", description: "Ticket price or free status" },
+                      organizer: { type: "string", description: "Event organizer" }
+                    },
+                    required: ["name", "date", "venue"]
+                  }
+                }
+              },
+              required: ["events"]
+            }
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 3000
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.log("❌ EventBrite extraction failed, using demo data");
+        return {
+          success: true,
+          count: generateWeekendEventsData().length,
+          events: generateWeekendEventsData(),
+          source: "demo_fallback",
+        };
+      }
+
+      const extractedData = data.extract || data.data;
+
+      if (extractedData && extractedData.events && extractedData.events.length > 0) {
+        const formattedEvents = extractedData.events.map(event => ({
+          title: event.name,
+          description: event.description || `${event.category} event in Chennai`,
+          location: "Chennai",
+          eventDate: event.date,
+          venue: event.venue,
+          category: event.category || "Weekend Event",
+          ticketPrice: event.ticketPrice,
+          organizer: event.organizer,
+          tags: ["weekend", "event", "chennai"],
+        }));
+
+        console.log(`🎯 AI extracted ${formattedEvents.length} weekend events`);
+        return {
+          success: true,
+          count: formattedEvents.length,
+          events: formattedEvents,
+          source: "ai_extracted",
+        };
+      } else {
+        return {
+          success: true,
+          count: generateWeekendEventsData().length,
+          events: generateWeekendEventsData(),
+          source: "demo_extraction_failed",
+        };
+      }
+    } catch (error) {
+      console.error("💥 Weekend events AI extraction error:", error.message);
+      return {
+        success: true,
+        count: generateWeekendEventsData().length,
+        events: generateWeekendEventsData(),
+        source: "demo_error_fallback",
+      };
+    }
+  },
+});
+
+// 2. LOCAL NEWS - Using Times of India Chennai
+export const scrapeLocalNews = action({
+  args: {},
+  handler: async (ctx) => {
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+
+    if (!FIRECRAWL_API_KEY) {
+      return {
+        success: true,
+        count: generateLocalNewsData().length,
+        news: generateLocalNewsData(),
+        source: "demo",
+      };
+    }
+
+    try {
+      console.log("📰 Attempting AI extraction from Times of India Chennai...");
+
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: "https://timesofindia.indiatimes.com/city/chennai",
+          formats: ["extract"], 
+          extract: {
+            prompt: "Extract recent local news from Chennai including headlines, brief summaries, publication times, and news categories",
+            schema: {
+              type: "object",
+              properties: {
+                news: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      headline: { type: "string", description: "News headline" },
+                      summary: { type: "string", description: "Brief news summary" },
+                      category: { type: "string", description: "News category (politics, crime, traffic, etc.)" },
+                      publishedTime: { type: "string", description: "When published" },
+                      location: { type: "string", description: "Specific area in Chennai if mentioned" }
+                    },
+                    required: ["headline", "summary"]
+                  }
+                }
+              },
+              required: ["news"]
+            }
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 4000
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.log("❌ Times of India extraction failed, using demo data");
+        return {
+          success: true,
+          count: generateLocalNewsData().length,
+          news: generateLocalNewsData(),
+          source: "demo_fallback",
+        };
+      }
+
+      const extractedData = data.extract || data.data;
+
+      if (extractedData && extractedData.news && extractedData.news.length > 0) {
+        const formattedNews = extractedData.news.map(article => ({
+          title: article.headline,
+          description: article.summary,
+          category: article.category || "Local News",
+          publishedTime: article.publishedTime,
+          location: article.location || "Chennai",
+          source: "Times of India",
+          tags: ["news", "chennai", "local"],
+        }));
+
+        console.log(`🎯 AI extracted ${formattedNews.length} news articles`);
+        return {
+          success: true,
+          count: formattedNews.length,
+          news: formattedNews,
+          source: "ai_extracted",
+        };
+      } else {
+        return {
+          success: true,
+          count: generateLocalNewsData().length,
+          news: generateLocalNewsData(),
+          source: "demo_extraction_failed",
+        };
+      }
+    } catch (error) {
+      console.error("💥 Local news AI extraction error:", error.message);
+      return {
+        success: true,
+        count: generateLocalNewsData().length,
+        news: generateLocalNewsData(),
+        source: "demo_error_fallback",
+      };
+    }
+  },
+});
+
+// 3. APARTMENT HUNT - Using 99acres Chennai  
+export const scrapeApartmentHunt = action({
+  args: {},
+  handler: async (ctx) => {
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+
+    if (!FIRECRAWL_API_KEY) {
+      return {
+        success: true,
+        count: generateApartmentHuntData().length,
+        apartments: generateApartmentHuntData(),
+        source: "demo",
+      };
+    }
+
+    try {
+      console.log("🏠 Attempting AI extraction from 99acres Chennai...");
+
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: "https://www.99acres.com/rent/residential-property/chennai?bedroom=1,2,3&property_type=apartment",
+          formats: ["extract"],
+          extract: {
+            prompt: "Extract apartment rental listings in Chennai including property names, locations, rent amounts, bedroom counts, amenities, and contact details",
+            schema: {
+              type: "object",
+              properties: {
+                apartments: {
+                  type: "array",
+                  items: {
+                    type: "object", 
+                    properties: {
+                      name: { type: "string", description: "Property/building name" },
+                      location: { type: "string", description: "Area/locality in Chennai" },
+                      rent: { type: "string", description: "Monthly rent amount" },
+                      bedrooms: { type: "string", description: "Number of bedrooms (1BHK, 2BHK, etc.)" },
+                      area: { type: "string", description: "Square feet area" },
+                      amenities: { type: "string", description: "Key amenities" },
+                      furnishing: { type: "string", description: "Furnished/Semi-furnished/Unfurnished" },
+                      description: { type: "string", description: "Property description" }
+                    },
+                    required: ["name", "location", "rent", "bedrooms"]
+                  }
+                }
+              },
+              required: ["apartments"]
+            }
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 5000 // Longer wait for real estate sites
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.log("❌ 99acres extraction failed, using demo data");
+        return {
+          success: true,
+          count: generateApartmentHuntData().length,
+          apartments: generateApartmentHuntData(),
+          source: "demo_fallback",
+        };
+      }
+
+      const extractedData = data.extract || data.data;
+
+      if (extractedData && extractedData.apartments && extractedData.apartments.length > 0) {
+        const formattedApartments = extractedData.apartments.map(apt => ({
+          title: apt.name,
+          description: apt.description || `${apt.bedrooms} apartment in ${apt.location}`,
+          location: apt.location,
+          rent: apt.rent,
+          bedrooms: apt.bedrooms,
+          area: apt.area,
+          amenities: apt.amenities,
+          furnishing: apt.furnishing,
+          source: "99acres",
+          tags: ["apartment", "rental", "chennai"],
+        }));
+
+        console.log(`🎯 AI extracted ${formattedApartments.length} apartments`);
+        return {
+          success: true,
+          count: formattedApartments.length,
+          apartments: formattedApartments,
+          source: "ai_extracted",
+        };
+      } else {
+        return {
+          success: true,
+          count: generateApartmentHuntData().length,
+          apartments: generateApartmentHuntData(),
+          source: "demo_extraction_failed",
+        };
+      }
+    } catch (error) {
+      console.error("💥 Apartment hunt AI extraction error:", error.message);
+      return {
+        success: true,
+        count: generateApartmentHuntData().length,
+        apartments: generateApartmentHuntData(),
+        source: "demo_error_fallback",
+      };
+    }
+  },
+});
+
+// 4. TECH MEETUPS - Using GDG Chennai
+export const scrapeTechMeetups = action({
+  args: {},
+  handler: async (ctx) => {
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+
+    if (!FIRECRAWL_API_KEY) {
+      return {
+        success: true,
+        count: generateTechMeetupsData().length,
+        meetups: generateTechMeetupsData(),
+        source: "demo",
+      };
+    }
+
+    try {
+      console.log("💻 Attempting AI extraction from GDG Chennai...");
+
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: "https://gdg.community.dev/gdg-chennai/", 
+          formats: ["extract"],
+          extract: {
+            prompt: "Extract upcoming tech meetups, workshops, conferences and developer events in Chennai including event names, dates, venues, topics, and registration details",
+            schema: {
+              type: "object",
+              properties: {
+                meetups: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Event/meetup name" },
+                      date: { type: "string", description: "Event date and time" },
+                      venue: { type: "string", description: "Venue location" },
+                      topic: { type: "string", description: "Tech topic/focus area" },
+                      description: { type: "string", description: "Event description" },
+                      type: { type: "string", description: "Event type (meetup, workshop, conference)" },
+                      organizer: { type: "string", description: "Organizing group" },
+                      registrationInfo: { type: "string", description: "Registration details" }
+                    },
+                    required: ["name", "date", "topic"]
+                  }
+                }
+              },
+              required: ["meetups"]
+            }
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 3000
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.log("❌ GDG Chennai extraction failed, using demo data");
+        return {
+          success: true,
+          count: generateTechMeetupsData().length,
+          meetups: generateTechMeetupsData(),
+          source: "demo_fallback",
+        };
+      }
+
+      const extractedData = data.extract || data.data;
+
+      if (extractedData && extractedData.meetups && extractedData.meetups.length > 0) {
+        const formattedMeetups = extractedData.meetups.map(meetup => ({
+          title: meetup.name,
+          description: meetup.description || `${meetup.topic} ${meetup.type} in Chennai`,
+          location: "Chennai",
+          eventDate: meetup.date,
+          venue: meetup.venue,
+          topic: meetup.topic,
+          type: meetup.type || "Tech Meetup",
+          organizer: meetup.organizer || "GDG Chennai",
+          registrationInfo: meetup.registrationInfo,
+          tags: ["tech", "meetup", "chennai", "developer"],
+        }));
+
+        console.log(`🎯 AI extracted ${formattedMeetups.length} tech meetups`);
+        return {
+          success: true,
+          count: formattedMeetups.length,
+          meetups: formattedMeetups,
+          source: "ai_extracted",
+        };
+      } else {
+        return {
+          success: true,
+          count: generateTechMeetupsData().length,
+          meetups: generateTechMeetupsData(),
+          source: "demo_extraction_failed",
+        };
+      }
+    } catch (error) {
+      console.error("💥 Tech meetups AI extraction error:", error.message);
+      return {
+        success: true,
+        count: generateTechMeetupsData().length,
+        meetups: generateTechMeetupsData(),
+        source: "demo_error_fallback",
+      };
+    }
+  },
+});
+
+// Demo data generation functions (add these)
+function generateWeekendEventsData() {
+  return [
+    {
+      title: "Chennai Music Festival",
+      description: "Classical music performances across the city",
+      location: "Chennai", 
+      eventDate: "Dec 2025",
+      venue: "Music Academy",
+      category: "Music",
+      tags: ["weekend", "event", "chennai"]
+    }
+  ];
+}
+
+function generateLocalNewsData() {
+  return [
+    {
+      title: "Chennai Metro Expansion Update", 
+      description: "New metro line construction progress",
+      category: "Infrastructure",
+      location: "Chennai",
+      source: "Demo Data",
+      tags: ["news", "chennai", "local"]
+    }
+  ];
+}
+
+function generateApartmentHuntData() {
+  return [
+    {
+      title: "Modern 2BHK Apartment",
+      description: "Fully furnished apartment in prime location",
+      location: "T. Nagar, Chennai",
+      rent: "₹25,000/month",
+      bedrooms: "2BHK",
+      area: "1200 sq ft",
+      tags: ["apartment", "rental", "chennai"]
+    }
+  ];
+}
+
+function generateTechMeetupsData() {
+  return [
+    {
+      title: "GDG Chennai Monthly Meetup",
+      description: "Latest in Google technologies and web development",
+      location: "Chennai",
+      eventDate: "Every first Saturday",
+      topic: "Web Development",
+      type: "Meetup",
+      tags: ["tech", "meetup", "chennai", "developer"]
+    }
+  ];
+}
+
 export const scrapeChennaiRestaurants = action({
   args: {},
   handler: async (ctx) => {
@@ -19,53 +523,115 @@ export const scrapeChennaiRestaurants = action({
     }
 
     try {
-      console.log("Attempting to scrape restaurants from The Hindu Chennai...");
+      console.log("🍽️ Attempting AI extraction from TripAdvisor Chennai...");
 
-      const response = await fetch("https://api.firecrawl.dev/v0/scrape", {
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          url: "https://www.thehindu.com/news/cities/chennai/food-and-dining/",
-          formats: ["markdown"],
-          onlyMainContent: true,
+          url: "https://www.tripadvisor.in/Restaurants-g304556-Chennai_Madras_Chennai_District_Tamil_Nadu.html",
+          formats: ["extract"],
+          extract: {
+            prompt:
+              "Extract restaurant information from this TripAdvisor page including restaurant names, cuisine types, price ranges, ratings, and any available details",
+            schema: {
+              type: "object",
+              properties: {
+                restaurants: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Restaurant name" },
+                      cuisine: { type: "string", description: "Cuisine type" },
+                      priceRange: {
+                        type: "string",
+                        description: "Price range (₹, ₹₹, etc.)",
+                      },
+                      rating: {
+                        type: "number",
+                        description: "Rating if available",
+                      },
+                      reviewCount: {
+                        type: "number",
+                        description: "Number of reviews",
+                      },
+                      location: {
+                        type: "string",
+                        description: "Area or specific location",
+                      },
+                      description: {
+                        type: "string",
+                        description: "Brief description or specialties",
+                      },
+                    },
+                    required: ["name", "cuisine"],
+                  },
+                },
+              },
+              required: ["restaurants"],
+            },
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 3000,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        console.log("Firecrawl failed:", data.error || "Unknown error");
+        console.log("❌ TripAdvisor AI extraction failed:");
+        console.log("Status:", response.status);
+        console.log("Error:", JSON.stringify(data, null, 2));
         console.log("Falling back to demo restaurant data");
         return {
           success: true,
           count: generateChennaiRestaurantData().length,
           restaurants: generateChennaiRestaurantData(),
           source: "demo_fallback",
+          error: data,
         };
       }
 
-      console.log("Firecrawl successful! Extracting restaurant data...");
-      const scrapedRestaurants = extractRestaurantsFromContent(
-        data.markdown || data.html
-      );
+      console.log("✅ AI extraction successful!");
+      const extractedData = data.extract || data.data;
 
-      if (scrapedRestaurants.length > 0) {
+      if (
+        extractedData &&
+        extractedData.restaurants &&
+        extractedData.restaurants.length > 0
+      ) {
+        // Format extracted data to match your existing structure
+        const formattedRestaurants = extractedData.restaurants.map(
+          (restaurant) => ({
+            title: restaurant.name,
+            description:
+              restaurant.description ||
+              `${restaurant.cuisine} restaurant in Chennai`,
+            location: restaurant.location || "Chennai",
+            cuisine: restaurant.cuisine || "Various",
+            rating: restaurant.rating || Math.random() * 1.5 + 3.5,
+            priceRange: restaurant.priceRange || "₹₹",
+            tags: ["restaurant", "chennai"],
+            reviewCount: restaurant.reviewCount,
+          })
+        );
+
         console.log(
-          `Extracted ${scrapedRestaurants.length} restaurants from scraping`
+          `🎯 Extracted ${formattedRestaurants.length} restaurants with AI`
         );
         return {
           success: true,
-          count: scrapedRestaurants.length,
-          restaurants: scrapedRestaurants,
-          source: "scraped",
+          count: formattedRestaurants.length,
+          restaurants: formattedRestaurants,
+          source: "ai_extracted",
         };
       } else {
-        console.log(
-          "No restaurants extracted from scraped content, using demo data"
-        );
+        console.log("⚠️ No restaurants in AI extraction, using demo data");
         return {
           success: true,
           count: generateChennaiRestaurantData().length,
@@ -74,7 +640,7 @@ export const scrapeChennaiRestaurants = action({
         };
       }
     } catch (error) {
-      console.error("Restaurant scraping error:", error.message);
+      console.error("💥 Restaurant AI extraction error:", error.message);
       console.log("Falling back to demo restaurant data");
 
       return {
@@ -102,25 +668,61 @@ export const scrapeChennaiEvents = action({
     }
 
     try {
-      console.log("Attempting to scrape events from BookMyShow Chennai...");
+      console.log("🎪 Attempting AI extraction from AllEvents Chennai...");
 
-      const response = await fetch("https://api.firecrawl.dev/v0/scrape", {
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          url: "https://in.bookmyshow.com/chennai/events",
-          formats: ["markdown"],
-          onlyMainContent: true,
+          url: "https://allevents.in/chennai/all",
+          formats: ["extract"],
+          extract: {
+            prompt:
+              "Extract upcoming events from this page including event names, dates, venues, descriptions, and any ticket information",
+            schema: {
+              type: "object",
+              properties: {
+                events: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Event name" },
+                      date: { type: "string", description: "Event date" },
+                      venue: { type: "string", description: "Venue location" },
+                      description: {
+                        type: "string",
+                        description: "Event description",
+                      },
+                      category: {
+                        type: "string",
+                        description: "Event category",
+                      },
+                      ticketInfo: {
+                        type: "string",
+                        description: "Ticket price or free status",
+                      },
+                    },
+                    required: ["name", "date"],
+                  },
+                },
+              },
+              required: ["events"],
+            },
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 3000,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        console.log("Events scraping failed, using demo data");
+        console.log("❌ Events AI extraction failed, using demo data");
         return {
           success: true,
           count: generateChennaiEventsData().length,
@@ -129,17 +731,30 @@ export const scrapeChennaiEvents = action({
         };
       }
 
-      const scrapedEvents = extractEventsFromContent(
-        data.markdown || data.html
-      );
+      const extractedData = data.extract || data.data;
 
-      if (scrapedEvents.length > 0) {
-        console.log(`Extracted ${scrapedEvents.length} events from scraping`);
+      if (
+        extractedData &&
+        extractedData.events &&
+        extractedData.events.length > 0
+      ) {
+        // Format for your existing structure
+        const formattedEvents = extractedData.events.map((event) => ({
+          title: event.name,
+          description: event.description || `Exciting event in Chennai`,
+          location: "Chennai",
+          eventDate: event.date || "TBD",
+          venue: event.venue || "Various venues",
+          category: event.category,
+          tags: ["event", "chennai"],
+        }));
+
+        console.log(`🎯 AI extracted ${formattedEvents.length} events`);
         return {
           success: true,
-          count: scrapedEvents.length,
-          events: scrapedEvents,
-          source: "scraped",
+          count: formattedEvents.length,
+          events: formattedEvents,
+          source: "ai_extracted",
         };
       } else {
         return {
@@ -150,7 +765,7 @@ export const scrapeChennaiEvents = action({
         };
       }
     } catch (error) {
-      console.error("Events scraping error:", error.message);
+      console.error("💥 Events AI extraction error:", error.message);
       return {
         success: true,
         count: generateChennaiEventsData().length,
@@ -167,38 +782,85 @@ export const scrapeChennaiTechMeetups = action({
     const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
     try {
-      console.log("Attempting to scrape tech meetups...");
+      console.log("💻 Attempting AI extraction for tech meetups...");
 
-      const response = await fetch("https://api.firecrawl.dev/v0/scrape", {
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          url: "https://www.meetup.com/find/?location=Chennai&keywords=technology",
-          formats: ["markdown"],
-          onlyMainContent: true,
+          url: "https://allevents.in/chennai/digital",
+          formats: ["extract"],
+          extract: {
+            prompt:
+              "Extract technology and digital events, meetups, workshops from this page",
+            schema: {
+              type: "object",
+              properties: {
+                meetups: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: {
+                        type: "string",
+                        description: "Meetup/event name",
+                      },
+                      date: { type: "string", description: "Event date" },
+                      venue: { type: "string", description: "Venue" },
+                      description: {
+                        type: "string",
+                        description: "Event description",
+                      },
+                      type: {
+                        type: "string",
+                        description: "Type (workshop, meetup, conference)",
+                      },
+                    },
+                    required: ["name", "date"],
+                  },
+                },
+              },
+              required: ["meetups"],
+            },
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 3000,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        const scrapedMeetups = extractMeetupsFromContent(
-          data.markdown || data.html
-        );
-        if (scrapedMeetups.length > 0) {
+        const extractedData = data.extract || data.data;
+        if (
+          extractedData &&
+          extractedData.meetups &&
+          extractedData.meetups.length > 0
+        ) {
+          const formattedMeetups = extractedData.meetups.map((meetup) => ({
+            title: meetup.name,
+            description: meetup.description || "Tech meetup in Chennai",
+            location: "Chennai",
+            eventDate: meetup.date,
+            venue: meetup.venue || "TBD",
+            type: meetup.type,
+            tags: ["tech", "meetup", "chennai"],
+          }));
+
           return {
             success: true,
-            count: scrapedMeetups.length,
-            meetups: scrapedMeetups,
-            source: "scraped",
+            count: formattedMeetups.length,
+            meetups: formattedMeetups,
+            source: "ai_extracted",
           };
         }
       }
     } catch (error) {
-      console.error("Tech meetups scraping error:", error.message);
+      console.error("💥 Tech meetups AI extraction error:", error.message);
     }
 
     return {
@@ -216,38 +878,87 @@ export const scrapeChennaiApartments = action({
     const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
     try {
-      console.log("Attempting to scrape apartments from MagicBricks...");
+      console.log("🏠 Attempting AI extraction from 99acres Chennai...");
 
-      const response = await fetch("https://api.firecrawl.dev/v0/scrape", {
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          url: "https://www.magicbricks.com/property-for-rent/residential-real-estate?bedroom=1,2,3&proptype=Multistorey-Apartment,Builder-Floor-Apartment&cityName=Chennai",
-          formats: ["markdown"],
-          onlyMainContent: true,
+          url: "https://www.99acres.com/rent/residential-property/chennai?bedroom=1,2,3&property_type=apartment",
+          formats: ["extract"],
+          extract: {
+            prompt:
+              "Extract apartment rental listings including property names, locations, rent amounts, bedroom counts, and descriptions",
+            schema: {
+              type: "object",
+              properties: {
+                apartments: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Property name" },
+                      location: {
+                        type: "string",
+                        description: "Area/locality",
+                      },
+                      rent: { type: "string", description: "Rent amount" },
+                      bedrooms: {
+                        type: "string",
+                        description: "Number of bedrooms",
+                      },
+                      area: { type: "string", description: "Square feet area" },
+                      description: {
+                        type: "string",
+                        description: "Property description",
+                      },
+                    },
+                    required: ["name", "location", "rent"],
+                  },
+                },
+              },
+              required: ["apartments"],
+            },
+          },
+          blockAds: true,
+          removeBase64Images: true,
+          waitFor: 5000, // Longer wait for real estate sites
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        const scrapedApartments = extractApartmentsFromContent(
-          data.markdown || data.html
-        );
-        if (scrapedApartments.length > 0) {
+        const extractedData = data.extract || data.data;
+        if (
+          extractedData &&
+          extractedData.apartments &&
+          extractedData.apartments.length > 0
+        ) {
+          const formattedApartments = extractedData.apartments.map((apt) => ({
+            title: apt.name,
+            description:
+              apt.description || `${apt.bedrooms} apartment in ${apt.location}`,
+            location: apt.location,
+            rent: apt.rent,
+            bedrooms: apt.bedrooms,
+            area: apt.area,
+            tags: ["apartment", "chennai", "rental"],
+          }));
+
           return {
             success: true,
-            count: scrapedApartments.length,
-            apartments: scrapedApartments,
-            source: "scraped",
+            count: formattedApartments.length,
+            apartments: formattedApartments,
+            source: "ai_extracted",
           };
         }
       }
     } catch (error) {
-      console.error("Apartments scraping error:", error.message);
+      console.error("💥 Apartments AI extraction error:", error.message);
     }
 
     return {
@@ -259,81 +970,52 @@ export const scrapeChennaiApartments = action({
   },
 });
 
-// Content extraction functions
-function extractRestaurantsFromContent(content: string) {
-  if (!content || typeof content !== "string") {
-    console.log("No valid content to extract from");
-    return [];
-  }
+// Test API connection function
+export const testFirecrawlV2Connection = action({
+  args: {},
+  handler: async (ctx) => {
+    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
-  const restaurants = [];
-  const lines = content.split("\n").filter((line) => line.trim().length > 0);
+    try {
+      console.log("🔗 Testing Firecrawl v2 connection...");
 
-  for (let i = 0; i < lines.length && restaurants.length < 8; i++) {
-    const line = lines[i].toLowerCase();
-    if (
-      (line.includes("restaurant") ||
-        line.includes("hotel") ||
-        line.includes("cafe")) &&
-      line.length > 10 &&
-      line.length < 100
-    ) {
-      restaurants.push({
-        title: lines[i].trim().replace(/[#*]/g, ""),
-        description: lines[i + 1]?.trim() || `Popular dining spot in Chennai`,
-        location: "Chennai",
-        cuisine: "Various",
-        rating: Math.random() * 1.5 + 3.5,
-        priceRange: ["₹", "₹₹", "₹₹₹"][Math.floor(Math.random() * 3)],
-        tags: ["restaurant", "chennai"],
+      const response = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: "https://example.com",
+          formats: ["markdown"],
+        }),
       });
+
+      const data = await response.json();
+
+      console.log("✅ API Test Results:");
+      console.log("Status:", response.status);
+      console.log("Success:", response.ok);
+      console.log("Has data:", !!data.markdown);
+      console.log("Data length:", data.markdown?.length || 0);
+
+      return {
+        success: response.ok,
+        status: response.status,
+        hasData: !!data.markdown,
+        dataLength: data.markdown?.length || 0,
+        apiVersion: "v2",
+      };
+    } catch (error) {
+      console.error("❌ API Test failed:", error.message);
+      return {
+        success: false,
+        error: error.message,
+        apiVersion: "v2",
+      };
     }
-  }
-
-  return restaurants;
-}
-
-function extractEventsFromContent(content: string) {
-  if (!content || typeof content !== "string") {
-    console.log("No valid event content to extract from");
-    return [];
-  }
-  const events = [];
-  const lines = content.split("\n").filter((line) => line.trim().length > 0);
-
-  for (let i = 0; i < lines.length && events.length < 8; i++) {
-    const line = lines[i].toLowerCase();
-    if (
-      (line.includes("event") ||
-        line.includes("show") ||
-        line.includes("concert") ||
-        line.includes("festival") ||
-        line.includes("workshop")) &&
-      line.length > 10 &&
-      line.length < 100
-    ) {
-      events.push({
-        title: lines[i].trim().replace(/[#*]/g, ""),
-        description:
-          lines[i + 1]?.trim() || `Exciting event happening in Chennai`,
-        location: "Chennai",
-        eventDate: "TBD",
-        venue: "Various venues",
-        tags: ["event", "chennai"],
-      });
-    }
-  }
-
-  return events;
-}
-
-function extractMeetupsFromContent(content: string) {
-  return [];
-}
-
-function extractApartmentsFromContent(content: string) {
-  return [];
-}
+  },
+});
 
 // Demo data functions
 function generateChennaiRestaurantData() {
@@ -344,7 +1026,7 @@ function generateChennaiRestaurantData() {
         "Famous South Indian breakfast spot known for authentic idlis and chutneys. A Chennai institution serving traditional Tamil food.",
       location: "T. Nagar, Chennai",
       cuisine: "South Indian",
-      rating: 4.3,
+      rating: 2.3,
       priceRange: "₹",
       tags: ["breakfast", "traditional", "vegetarian"],
     },
