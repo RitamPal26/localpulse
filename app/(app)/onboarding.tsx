@@ -12,16 +12,30 @@ import { router } from "expo-router";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { AVAILABLE_PULSES } from "../../src/constants/pulses";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
+
+// A list of cities you support. You can expand this list later.
+const CITIES = [
+  { id: "chennai", name: "Chennai" },
+  { id: "mumbai", name: "Mumbai" },
+  { id: "bangalore", name: "Bangalore" },
+  { id: "delhi", name: "Delhi" },
+];
 
 export default function OnboardingScreen() {
+  // NEW: State to manage the onboarding step ('city' or 'pulses')
+  const [step, setStep] = useState("city");
+  // NEW: State to store the user's chosen city
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+
   const [selectedPulses, setSelectedPulses] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
+  // Convex mutations
+  const saveCity = useMutation(api.pulses.saveUserCity);
   const savePulsePreferences = useMutation(api.pulses.savePulsePreferences);
 
-  // Toggle pulse selection
   const togglePulse = (pulseId: string) => {
     setSelectedPulses((prev) =>
       prev.includes(pulseId)
@@ -30,24 +44,27 @@ export default function OnboardingScreen() {
     );
   };
 
-  // Handle completion
+  // UPDATED: handleComplete now saves both city and pulses
   const handleComplete = async () => {
+    if (!selectedCity) {
+      Alert.alert("Select City", "Please select your city to continue.");
+      return;
+    }
     if (selectedPulses.length === 0) {
-      Alert.alert(
-        "Select Interests",
-        "Please select at least one pulse to continue."
-      );
+      Alert.alert("Select Interests", "Please select at least one pulse.");
       return;
     }
 
     setIsLoading(true);
     try {
+      // Save both the city and the pulse preferences
+      await saveCity({ city: selectedCity });
       await savePulsePreferences({ selectedPulses });
+
       setShowConfirmation(true);
 
-      // Navigate to main app after short delay
       setTimeout(() => {
-        router.replace("/"); // Go back to index.tsx to re-evaluate
+        router.replace("/");
       }, 2000);
     } catch (error) {
       console.error("Error saving preferences:", error);
@@ -57,7 +74,9 @@ export default function OnboardingScreen() {
     }
   };
 
-  // Confirmation screen
+  // --- UI Rendering ---
+
+  // Confirmation screen (no changes needed here)
   if (showConfirmation) {
     return (
       <SafeAreaView style={styles.container}>
@@ -65,109 +84,118 @@ export default function OnboardingScreen() {
           <Text style={styles.confirmationIcon}>🎉</Text>
           <Text style={styles.confirmationTitle}>All Set!</Text>
           <Text style={styles.confirmationSubtitle}>
-            Your ChennaiPulse feed is being personalized...
+            Your LocalPulse feed for {selectedCity} is being personalized...
           </Text>
-          <View style={styles.selectedPulsesPreview}>
-            {selectedPulses.map((pulseId) => {
-              const pulse = AVAILABLE_PULSES.find((p) => p.id === pulseId);
-              return (
-                <View key={pulseId} style={styles.miniPulseCard}>
-                  <Text style={styles.miniPulseIcon}>{pulse?.icon}</Text>
-                  <Text style={styles.miniPulseName}>{pulse?.name}</Text>
-                </View>
-              );
-            })}
-          </View>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Main onboarding screen
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Welcome to ChennaiPulse! 👋</Text>
-          <Text style={styles.subtitle}>
-            Choose what you&apos;d like to discover in Chennai. You can always
-            change these later.
-          </Text>
-        </View>
-
-        {/* Pulse Selection */}
-        <View style={styles.pulsesContainer}>
-          {AVAILABLE_PULSES.map((pulse) => {
-            const isSelected = selectedPulses.includes(pulse.id);
-            return (
+  // NEW: Step 1 - City Selection UI
+  if (step === "city") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome to LocalPulse! 📍</Text>
+            <Text style={styles.subtitle}>
+              First, let&apos;s find your city.
+            </Text>
+          </View>
+          <View style={styles.pulsesContainer}>
+            {CITIES.map((city) => (
               <TouchableOpacity
-                key={pulse.id}
+                key={city.id}
                 style={[
                   styles.pulseCard,
-                  { backgroundColor: pulse.color + "20" }, // Add transparency
-                  isSelected && styles.pulseCardSelected,
+                  selectedCity === city.name && styles.pulseCardSelected,
                 ]}
-                onPress={() => togglePulse(pulse.id)}
-                activeOpacity={0.7}
+                onPress={() => setSelectedCity(city.name)}
               >
-                {/* Selection indicator */}
-                <View style={styles.pulseCardHeader}>
-                  <Text style={styles.pulseIcon}>{pulse.icon}</Text>
-                  <View
-                    style={[
-                      styles.selectionIndicator,
-                      isSelected && styles.selectionIndicatorActive,
-                    ]}
-                  >
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                </View>
-
-                {/* Content */}
-                <Text style={styles.pulseName}>{pulse.name}</Text>
-                <Text style={styles.pulseDescription}>{pulse.description}</Text>
-                <Text style={styles.pulsePreview}>
-                  &quot;{pulse.preview}&quot;
-                </Text>
+                <Text style={styles.pulseName}>{city.name}</Text>
               </TouchableOpacity>
-            );
-          })}
+            ))}
+          </View>
+        </ScrollView>
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              !selectedCity && styles.completeButtonDisabled,
+            ]}
+            onPress={() => setStep("pulses")}
+            disabled={!selectedCity}
+          >
+            <Text style={styles.completeButtonText}>Next</Text>
+          </TouchableOpacity>
         </View>
+      </SafeAreaView>
+    );
+  }
 
-        {/* Selected count */}
-        <View style={styles.selectionSummary}>
-          <Text style={styles.selectionText}>
-            {selectedPulses.length} pulse
-            {selectedPulses.length !== 1 ? "s" : ""} selected
-          </Text>
-        </View>
-      </ScrollView>
-
-      {/* Bottom CTA */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity
-          style={[
-            styles.completeButton,
-            selectedPulses.length === 0 && styles.completeButtonDisabled,
-          ]}
-          onPress={handleComplete}
-          disabled={isLoading || selectedPulses.length === 0}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.completeButtonText}>
-              Start My ChennaiPulse Journey
+  // MODIFIED: Step 2 - Pulse Selection UI
+  if (step === "pulses") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.header}>
+            <Text style={styles.title}>What&apos;s your pulse? ✨</Text>
+            <Text style={styles.subtitle}>
+              Choose what you&apos;d like to discover in {selectedCity}. You can
+              always change these later.
             </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
+          </View>
+
+          <View style={styles.pulsesContainer}>
+            {AVAILABLE_PULSES.map((pulse) => {
+              const isSelected = selectedPulses.includes(pulse.id);
+              return (
+                <TouchableOpacity
+                  key={pulse.id}
+                  style={[
+                    styles.pulseCard,
+                    { backgroundColor: pulse.color + "20" },
+                    isSelected && styles.pulseCardSelected,
+                  ]}
+                  onPress={() => togglePulse(pulse.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.pulseCardHeader}>
+                    <Text style={styles.pulseIcon}>{pulse.icon}</Text>
+                    {/* ... selection indicator */}
+                  </View>
+                  <Text style={styles.pulseName}>{pulse.name}</Text>
+                  <Text style={styles.pulseDescription}>
+                    {pulse.description}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              selectedPulses.length === 0 && styles.completeButtonDisabled,
+            ]}
+            onPress={handleComplete}
+            disabled={isLoading || selectedPulses.length === 0}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.completeButtonText}>
+                Start My LocalPulse Journey
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return null; // Fallback
 }
 
 const styles = StyleSheet.create({

@@ -39,7 +39,7 @@ export const enhanceWithAI = action({
     });
 
     try {
-      const prompt = `You are an expert Chennai local guide and content creator. Create an engaging summary for this ${contentType} that will excite Chennai locals.
+      const prompt = `You are an expert local guide and content creator. Create an engaging summary for this ${contentType} that will excite the locals.
 
 ### CONTENT TO SUMMARIZE ###
 Title: ${title}
@@ -52,10 +52,10 @@ ${cuisine ? `Cuisine: ${cuisine}` : ""}
 
 ### REQUIREMENTS ###
 - Write exactly 2-3 compelling sentences that grab attention
-- Focus on what makes this special for Chennai residents
+- Focus on what makes this special for local residents
 - Include practical details (timing, location, price) naturally in the text
 - Make it locally relevant and exciting
-- Use Chennai context and cultural references where appropriate
+- Use local context and cultural references where appropriate
 - End with an engaging call-to-action phrase
 
 ### OUTPUT FORMAT ###
@@ -64,7 +64,7 @@ Return a valid JSON object with this exact structure:
   "summary": "Your engaging 2-3 sentence summary here",
   "highlights": ["key feature 1", "key feature 2", "key feature 3"],
   "callToAction": "Short exciting call-to-action phrase!",
-  "localContext": "Why this matters to Chennai locals specifically"
+  "localContext": "Why this matters to locals specifically"
 }
 
 Ensure the JSON is properly formatted and valid.`;
@@ -74,7 +74,7 @@ Ensure the JSON is properly formatted and valid.`;
           {
             role: "system",
             content:
-              "You are a Chennai local guide expert. Always respond with valid JSON only.",
+              "You are a JSON expert. Your sole purpose is to return a single, valid, perfectly formatted JSON object. Do not include any text, greetings, or explanations before or after the JSON. Ensure all strings are properly escaped and terminated.",
           },
           {
             role: "user",

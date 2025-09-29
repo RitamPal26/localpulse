@@ -1,167 +1,174 @@
-import { action } from "./_generated/server";
-import { v } from "convex/values";
-import { api } from "./_generated/api";
+"use node";
 
-// UPDATED: Complete data ingestion with all 5 categories
-export const populateAllContentTypes = action({
+import { api } from "./_generated/api";
+import { v } from "convex/values";
+import { action } from "./_generated/server";
+
+const MAX_ITEMS_PER_CATEGORY = 5;
+const SUPPORTED_CITIES = ["Chennai", "Mumbai", "Bangalore", "Delhi"];
+
+// =================================================
+// MANAGER ACTION
+// This is the main action you will run.
+// =================================================
+export const populateAllCities = action({
   args: {},
   handler: async (ctx) => {
-    console.log("🚀 Starting comprehensive data ingestion with NEW sources...");
+    console.log("🚀 Starting data ingestion for all supported cities...");
+    await ctx.runMutation(api.pulses.deleteAllPulseContent);
 
-    try {
-      let totalProcessed = 0;
-      const results = {};
-
-      // 1. RESTAURANTS - TripAdvisor (working well)
-      console.log("📍 Scraping restaurants from TripAdvisor...");
-      const restaurants = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiRestaurants, // Keep existing working function
-        {}
-      );
-      const restaurantCount = await processItems(
-        ctx,
-        restaurants.restaurants,
-        "restaurants",
-        "restaurant"
-      );
-      totalProcessed += restaurantCount;
-      results.restaurants = {
-        count: restaurantCount,
-        source: restaurants.source,
-      };
-
-      // 2. WEEKEND EVENTS - EventBrite (NEW)
-      console.log("🎪 Scraping weekend events from EventBrite...");
-      const weekendEvents = await ctx.runAction(
-        api.actions.scraper.scrapeWeekendEvents, // NEW function name
-        {}
-      );
-      const weekendCount = await processItems(
-        ctx,
-        weekendEvents.events,
-        "weekend-events",
-        "weekend-event"
-      );
-      totalProcessed += weekendCount;
-      results.weekendEvents = {
-        count: weekendCount,
-        source: weekendEvents.source,
-      };
-
-      // 3. LOCAL NEWS - Times of India (NEW)
-      console.log("📰 Scraping local news from Times of India...");
-      const localNews = await ctx.runAction(
-        api.actions.scraper.scrapeLocalNews, // NEW function name
-        {}
-      );
-      const newsCount = await processItems(
-        ctx,
-        localNews.news,
-        "local-news",
-        "news"
-      );
-      totalProcessed += newsCount;
-      results.localNews = { count: newsCount, source: localNews.source };
-
-      // 4. APARTMENT HUNT - 99acres (NEW)
-      console.log("🏠 Scraping apartments from 99acres...");
-      const apartments = await ctx.runAction(
-        api.actions.scraper.scrapeApartmentHunt, // NEW function name
-        {}
-      );
-      const apartmentCount = await processItems(
-        ctx,
-        apartments.apartments,
-        "apartment-hunt",
-        "apartment"
-      );
-      totalProcessed += apartmentCount;
-      results.apartments = { count: apartmentCount, source: apartments.source };
-
-      // 5. TECH MEETUPS - GDG Chennai (NEW)
-      console.log("💻 Scraping tech meetups from GDG Chennai...");
-      const techMeetups = await ctx.runAction(
-        api.actions.scraper.scrapeTechMeetups, // NEW function name
-        {}
-      );
-      const meetupCount = await processItems(
-        ctx,
-        techMeetups.meetups,
-        "tech-meetups",
-        "tech-meetup"
-      );
-      totalProcessed += meetupCount;
-      results.techMeetups = { count: meetupCount, source: techMeetups.source };
-
-      console.log("✅ All categories scraped successfully!");
-      console.log(`📊 Total processed: ${totalProcessed} items`);
-
-      return {
-        success: true,
-        totalProcessed: totalProcessed,
-        results: results,
-        message: "All 5 categories scraped with new AI extraction!",
-      };
-    } catch (error) {
-      console.error("💥 Comprehensive ingestion error:", error);
-      return {
-        success: false,
-        error: error.message,
-        totalProcessed: 0,
-      };
+    for (const city of SUPPORTED_CITIES) {
+      await ctx.scheduler.runAfter(0, api.dataIngestion.populateSingleCity, {
+        city: city,
+      });
     }
+    console.log("✅ All city scraping jobs have been scheduled.");
   },
 });
 
-// UPDATED: Helper function to process any content type
-async function processItems(ctx, items, pulseId, contentType) {
-  let processed = 0;
+// =================================================
+// WORKER ACTION
+// This action performs all the scraping and processing for ONE city.
+// =================================================
+export const populateSingleCity = action({
+  args: {
+    city: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { city } = args;
+    console.log(`➡️ Populating all content for ${city}...`);
+    let totalProcessed = 0;
 
+    // Run all scraper actions for the given city
+    const restaurants = await ctx.runAction(
+      api.actions.scraper.scrapeRestaurants,
+      { city }
+    );
+    const limitedRestaurants =
+      restaurants.data?.slice(0, MAX_ITEMS_PER_CATEGORY) ?? [];
+    totalProcessed += await processItems(
+      ctx,
+      limitedRestaurants,
+      "restaurants",
+      "restaurant",
+      city
+    );
+
+    const weekendEvents = await ctx.runAction(
+      api.actions.scraper.scrapeWeekendEvents,
+      { city }
+    );
+    const limitedEvents =
+      weekendEvents.data?.slice(0, MAX_ITEMS_PER_CATEGORY) ?? [];
+    totalProcessed += await processItems(
+      ctx,
+      limitedEvents,
+      "weekend-events",
+      "weekend-event",
+      city
+    );
+
+    const localNews = await ctx.runAction(api.actions.scraper.scrapeLocalNews, {
+      city,
+    });
+    const limitedNews = localNews.data?.slice(0, MAX_ITEMS_PER_CATEGORY) ?? [];
+    totalProcessed += await processItems(
+      ctx,
+      limitedNews,
+      "local-news",
+      "news",
+      city
+    );
+
+    // ADDED: Scrape and process Apartments
+    const apartments = await ctx.runAction(
+      api.actions.scraper.scrapeApartmentHunt,
+      { city }
+    );
+    const limitedApartments =
+      apartments.data?.slice(0, MAX_ITEMS_PER_CATEGORY) ?? [];
+    totalProcessed += await processItems(
+      ctx,
+      limitedApartments,
+      "apartment-hunt",
+      "apartment",
+      city
+    );
+
+    // ADDED: Scrape and process Tech Meetups
+    const techMeetups = await ctx.runAction(
+      api.actions.scraper.scrapeTechMeetups,
+      { city }
+    );
+    const limitedMeetups =
+      techMeetups.data?.slice(0, MAX_ITEMS_PER_CATEGORY) ?? [];
+    totalProcessed += await processItems(
+      ctx,
+      limitedMeetups,
+      "tech-meetups",
+      "tech-meetup",
+      city
+    );
+
+    console.log(
+      `✅ Finished populating content for ${city}. Total items: ${totalProcessed}`
+    );
+  },
+});
+
+// =================================================
+// HELPER FUNCTION
+// This function processes and saves items for a specific city.
+// =================================================
+async function processItems(
+  ctx: any,
+  items: any[],
+  pulseId: string,
+  contentType: string,
+  city: string
+) {
+  let processed = 0;
   if (!items || !Array.isArray(items)) {
-    console.log(`⚠️ No items to process for ${contentType}`);
+    console.log(`⚠️ No items to process for ${contentType} in ${city}`);
     return 0;
   }
-
-  console.log(`Processing ${items.length} ${contentType} items...`);
+  console.log(`Processing ${items.length} ${contentType} items for ${city}...`);
 
   for (const item of items) {
     try {
-      // ENHANCED AI processing with corrected parameters
       const aiResult = await ctx.runAction(
         api.actions.aiProcessor.enhanceWithAI,
         {
           title: item.title,
           description: item.description,
           contentType: contentType,
-          sourceUrl: item.sourceUrl || getSourceUrlForType(contentType),
-          eventDate: item.eventDate || undefined, // ✅ Fixed
-          location: item.location || "Chennai",
-          price: item.price || item.rent || undefined, // ✅ Fixed
-          rating: item.rating || undefined, // ✅ Fixed
-          cuisine: item.cuisine || undefined, // ✅ Fixed
+          sourceUrl: item.sourceUrl || getSourceUrlForType(contentType, city),
+          eventDate: item.eventDate,
+          location: item.location || city,
+          price: item.price || item.rent,
+          rating: item.rating,
+          cuisine: item.cuisine,
         }
       );
 
-      // Prepare content based on type
       const baseContent = {
         pulseId: pulseId,
         title: item.title,
         description: aiResult.aiSummary || item.description,
-        source: getSourceForType(contentType),
-        sourceUrl: item.sourceUrl || getSourceUrlForType(contentType), // Keep original URL if available
+        source: getSourceForType(contentType, city),
+        sourceUrl: item.sourceUrl || getSourceUrlForType(contentType, city),
         scrapedAt: Date.now(),
-        location: item.location || "Chennai",
+        location: item.location || city,
         contentType: contentType,
-        // NEW: Add enhanced AI data
         aiSummary: aiResult.aiSummary,
         highlights: aiResult.highlights || [],
         callToAction: aiResult.callToAction || "Learn more!",
         localContext: aiResult.localContext || "",
         extractedData: aiResult.extractedData || {},
-        tags: item.tags || [contentType],
+        tags: item.tags || [contentType, city.toLowerCase()],
+        city: city,
       };
 
-      // Add type-specific fields (keeping your existing logic)
       let contentItem = { ...baseContent };
 
       if (contentType === "restaurant") {
@@ -200,115 +207,32 @@ async function processItems(ctx, items, pulseId, contentType) {
 
       await ctx.runMutation(api.pulses.addPulseContent, contentItem);
       processed++;
-
-      console.log(`✓ Processed: ${item.title}`);
-      console.log(`  - AI Summary: ${aiResult.aiSummary?.substring(0, 50)}...`);
-      console.log(`  - Highlights: ${aiResult.highlights?.length || 0}`);
-
-      // Small delay between items
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      console.log(`✓ Processed: ${item.title} for ${city}`);
     } catch (error) {
-      console.error(`❌ Error processing ${item.title}:`, error);
-      // Continue with next item
+      console.error(`❌ Error processing ${item.title} for ${city}:`, error);
     }
   }
-
-  console.log(
-    `✅ Completed ${contentType}: ${processed}/${items.length} items processed`
-  );
   return processed;
 }
 
-// UPDATED: Source mapping for new scraping sources
-function getSourceForType(contentType) {
+// Helper functions
+function getSourceForType(contentType: string, city: string) {
   const sources = {
     restaurant: "TripAdvisor",
     "weekend-event": "EventBrite",
     news: "Times of India",
     apartment: "99acres",
-    "tech-meetup": "GDG Chennai",
+    "tech-meetup": "GDG",
   };
   return sources[contentType] || "Local Source";
 }
-
-// UPDATED: Source URLs for new scraping sources
-function getSourceUrlForType(contentType) {
+function getSourceUrlForType(contentType: string, city: string) {
   const urls = {
-    restaurant:
-      "https://www.tripadvisor.in/Restaurants-g304556-Chennai_Madras_Chennai_District_Tamil_Nadu.html",
-    "weekend-event": "https://www.eventbrite.com/d/india--chennai/events/",
-    news: "https://timesofindia.indiatimes.com/city/chennai",
-    apartment: "https://www.99acres.com/rent/residential-property/chennai",
-    "tech-meetup": "https://gdg.community.dev/gdg-chennai/",
+    restaurant: `https://www.tripadvisor.in/Restaurants-g304556-${city}.html`,
+    "weekend-event": `https://www.eventbrite.com/d/india--${city}/events/`,
+    news: `https://timesofindia.indiatimes.com/city/${city}`,
+    apartment: `https://www.99acres.com/rent/residential-property/${city}`,
+    "tech-meetup": `https://gdg.community.dev/gdg-${city}/`,
   };
   return urls[contentType] || "https://example.com";
 }
-
-// Helper action to clear all content (for testing)
-export const clearAllContent = action({
-  args: {},
-  handler: async (ctx) => {
-    console.log("🗑️ Clearing all content...");
-    const allContent = await ctx.runQuery(api.pulses.getAllPulseContent);
-
-    for (const item of allContent) {
-      await ctx.runMutation(api.pulses.deletePulseContent, { id: item._id });
-    }
-
-    console.log(`✅ Cleared ${allContent.length} items`);
-    return { cleared: allContent.length };
-  },
-});
-
-// Test individual categories
-export const testRestaurantScraping = action({
-  args: {},
-  handler: async (ctx) => {
-    const result = await ctx.runAction(
-      api.actions.scraper.scrapeChennaiRestaurants,
-      {}
-    );
-    return result;
-  },
-});
-
-export const testWeekendEventScraping = action({
-  args: {},
-  handler: async (ctx) => {
-    const result = await ctx.runAction(
-      api.actions.scraper.scrapeWeekendEvents,
-      {}
-    );
-    return result;
-  },
-});
-
-export const testNewsScraping = action({
-  args: {},
-  handler: async (ctx) => {
-    const result = await ctx.runAction(api.actions.scraper.scrapeLocalNews, {});
-    return result;
-  },
-});
-
-export const testApartmentScraping = action({
-  args: {},
-  handler: async (ctx) => {
-    const result = await ctx.runAction(
-      api.actions.scraper.scrapeApartmentHunt,
-      {}
-    );
-    return result;
-  },
-});
-
-export const testTechMeetupScraping = action({
-  args: {},
-  handler: async (ctx) => {
-    const result = await ctx.runAction(
-      api.actions.scraper.scrapeTechMeetups,
-      {}
-    );
-    return result;
-  },
-});

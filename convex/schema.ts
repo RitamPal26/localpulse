@@ -32,21 +32,18 @@ export default defineSchema({
     tags: v.array(v.string()),
     title: v.string(),
     venue: v.optional(v.string()),
-
-    // ADD THESE MISSING FIELDS:
-    //contactInfo: v.optional(v.string()), // ← This was missing!
+    city: v.string(),
     organizer: v.optional(v.string()),
     publishedTime: v.optional(v.string()),
     ticketPrice: v.optional(v.string()),
-
-    // Enhanced AI fields:
     highlights: v.optional(v.array(v.string())),
     callToAction: v.optional(v.string()),
     localContext: v.optional(v.string()),
     extractedData: v.optional(v.any()),
   })
     .index("by_content_type", ["contentType"]) // ← Keep indices
-    .index("by_pulse", ["pulseId"]),
+    .index("by_pulse", ["pulseId"])
+    .index("by_city", ["city"]),
 
   userPulsePreferences: defineTable({
     createdAt: v.float64(),
@@ -61,5 +58,6 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     tokenIdentifier: v.string(),
+    city: v.optional(v.string()),
   }).index("by_token", ["tokenIdentifier"]), // ← CRITICAL: Keep this index!
 });

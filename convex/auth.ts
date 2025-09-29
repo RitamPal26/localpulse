@@ -17,7 +17,7 @@ export const createAuth = (
       disabled: optionsOnly,
     },
     baseURL: process.env.CONVEX_SITE_URL + "/api/auth",
-    trustedOrigins: ["localpulse://", "https://giant-opossum-714.convex.site"],
+    trustedOrigins: ["localpulse://", "https://giant-opossum-714.convex.site", "http://localhost:8081",],
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,

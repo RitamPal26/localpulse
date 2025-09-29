@@ -4,941 +4,525 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 
 // =====================================
-// 1. RESTAURANTS
+// GENERIC MULTI-CITY SCRAPER FUNCTION
 // =====================================
-export const scrapeChennaiRestaurants = action({
-  args: {},
-  handler: async (ctx) => {
-    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 
-    if (!FIRECRAWL_API_KEY) {
-      return {
-        success: true,
-        count: generateChennaiRestaurantData().length,
-        restaurants: generateChennaiRestaurantData(),
-        source: "demo",
-      };
+/**
+ * Performs a scrape operation for a given city using a dynamic configuration.
+ * @param {string} city - The city to scrape data for (e.g., "Chennai", "Mumbai").
+ * @param {object} config - The configuration for the scraping task.
+ * @returns {Promise<object>} - A promise that resolves to the scraped data or demo data.
+ */
+async function performScrape(city: string, config: any) {
+  const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+
+  const getDemoData = (source: string) => ({
+    success: true,
+    data: config.demoDataFunction(city),
+    source: source,
+  });
+
+  if (!FIRECRAWL_API_KEY) {
+    return getDemoData("demo");
+  }
+
+  try {
+    const response = await fetch("https://api.firecrawl.dev/v2/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: config.query.replace(/{{city}}/g, city),
+        location: city,
+        limit: 4,
+        ...config.searchParams,
+        scrapeOptions: {
+          formats: [
+            {
+              type: "json",
+              schema: config.schema,
+              prompt: config.prompt.replace(/{{city}}/g, city),
+            },
+          ],
+        },
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!data.success || !data.data?.web || data.data.web.length === 0) {
+      console.error(
+        `Firecrawl API did not return successful data for ${config.dataKey} in ${city}. Full response:`,
+        JSON.stringify(data, null, 2)
+      );
     }
 
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: "best restaurants Chennai food dining 2025",
-          location: "Chennai",
-          limit: 10,
-          tbs: "qdr:m",
-          scrapeOptions: {
-            formats: [
-              {
-                type: "json",
-                schema: {
-                  type: "object",
-                  properties: {
-                    restaurants: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: {
-                            type: "string",
-                            description: "Restaurant name",
-                          },
-                          cuisine: {
-                            type: "string",
-                            description: "Cuisine type",
-                          },
-                          priceRange: {
-                            type: "string",
-                            description: "Price range",
-                          },
-                          rating: { type: "number", description: "Rating" },
-                          location: {
-                            type: "string",
-                            description: "Area in Chennai",
-                          },
-                          description: {
-                            type: "string",
-                            description: "Description",
-                          },
-                        },
-                        required: ["name", "cuisine"],
-                      },
-                    },
-                  },
-                  required: ["restaurants"],
-                },
-                prompt:
-                  "Extract restaurant information from these Chennai restaurant search results",
-              },
-            ],
-          },
-        }),
-      });
+    if (data.success && data.data?.length > 0) {
+      const allItems = [];
 
-      const data = await response.json();
+      // CORRECTED: Changed 'result.data.web' to 'data.data.web'
+      data.data.forEach((page: any) => {
+        // CORRECTED: Changed 'config.resultKey' to 'config.dataKey' to match your config
+        const extractedData = page.json?.[config.dataKey];
+        if (extractedData && Array.isArray(extractedData)) {
+          extractedData.forEach((item: any) => {
+            const mappedItem = config.transform(item, page, city);
 
-      if (data.success && data.data?.web?.length > 0) {
-        const allRestaurants = [];
-
-        data.data.web.forEach((result) => {
-          if (
-            result.json?.restaurants &&
-            Array.isArray(result.json.restaurants)
-          ) {
-            result.json.restaurants.forEach((restaurant) => {
-              allRestaurants.push({
-                title: restaurant.name,
-                description:
-                  restaurant.description ||
-                  `${restaurant.cuisine} restaurant in Chennai`,
-                location: restaurant.location || "Chennai",
-                cuisine: restaurant.cuisine || "Various",
-                rating: restaurant.rating || Math.random() * 1.5 + 3.5,
-                priceRange: restaurant.priceRange || "₹₹",
-                sourceUrl:
-                  result.url ||
-                  result.sourceURL ||
-                  "https://www.tripadvisor.in/Restaurants-g304556-Chennai.html", // NEW
-                price: restaurant.priceRange || "₹300-500 per person", // NEW - for AI processor
-                //contactInfo: restaurant.phone || restaurant.contact || undefined, // NEW
-                tags: ["restaurant", "chennai"],
-              });
-            });
-          } else {
-            let restaurantName = result.title || "Chennai Restaurant";
-            if (restaurantName.includes(" - ")) {
-              restaurantName = restaurantName.split(" - ")[0];
+            // Apply the filter if it exists
+            if (config.filter ? config.filter(mappedItem, city) : true) {
+              allItems.push(mappedItem);
             }
-
-            allRestaurants.push({
-              title: restaurantName.substring(0, 50),
-              description:
-                result.description?.substring(0, 200) ||
-                "Popular restaurant in Chennai",
-              location: "Chennai",
-              cuisine: "Various",
-              rating: Math.random() * 1.5 + 3.5,
-              priceRange: "₹₹",
-              sourceUrl:
-                result.url || result.sourceURL || "https://example.com", // NEW
-              price: "₹300-500 per person", // NEW
-              tags: ["restaurant", "chennai"],
-            });
-          }
-        });
-
-        if (allRestaurants.length > 0) {
-          return {
-            success: true,
-            count: allRestaurants.length,
-            restaurants: allRestaurants.slice(0, 10),
-            source: "search_extracted",
-          };
+          });
         }
-      }
+      });
 
-      throw new Error("No results from search");
-    } catch (error) {
-      return {
-        success: true,
-        count: generateChennaiRestaurantData().length,
-        restaurants: generateChennaiRestaurantData(),
-        source: "demo_fallback",
-      };
+      if (allItems.length > 0) {
+        // CORRECTED: Simplified the return object to use a 'data' key,
+        // which is what your dataIngestion file expects.
+        return { success: true, data: allItems, source: "search_extracted" };
+      }
     }
+
+    throw new Error("No results from search");
+  } catch (error) {
+    console.error(`Error scraping ${config.dataKey} for ${city}:`, error);
+    return getDemoData("demo_fallback");
+  }
+}
+
+// =====================================
+// EXPORTED CONVEX ACTIONS
+// =====================================
+
+// 1. Restaurants
+export const scrapeRestaurants = action({
+  args: { city: v.string() },
+  handler: async (ctx, args) => {
+    const config = {
+      query: "best restaurants {{city}} food dining 2025",
+      schema: {
+        /* Restaurant Schema */ type: "object",
+        properties: {
+          restaurants: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                cuisine: { type: "string" },
+                priceRange: { type: "string" },
+                rating: { type: "number" },
+                location: { type: "string" },
+                description: { type: "string" },
+              },
+              required: ["name", "cuisine"],
+            },
+          },
+        },
+        required: ["restaurants"],
+      },
+      prompt:
+        "Extract restaurant information from these {{city}} restaurant search results",
+      dataKey: "restaurants",
+      resultKey: "restaurants",
+      transform: (item, result, city) => ({
+        title: item.name,
+        description:
+          item.description || `${item.cuisine} restaurant in ${city}`,
+        location: item.location || city,
+        cuisine: item.cuisine || "Various",
+        rating: item.rating || Math.random() * 1.5 + 3.5,
+        priceRange: item.priceRange || "₹₹",
+        sourceUrl: result.url || result.sourceURL,
+        price: item.priceRange || "₹300-500 per person",
+        tags: ["restaurant", city.toLowerCase()],
+      }),
+      fallbackTransform: (result, city) => ({
+        title: (result.title || `${city} Restaurant`).substring(0, 50),
+        description:
+          result.description?.substring(0, 200) ||
+          `Popular restaurant in ${city}`,
+        location: city,
+        cuisine: "Various",
+        rating: Math.random() * 1.5 + 3.5,
+        priceRange: "₹₹",
+        sourceUrl: result.url || result.sourceURL,
+        price: "₹300-500 per person",
+        tags: ["restaurant", city.toLowerCase()],
+      }),
+      demoDataFunction: generateRestaurantData,
+      searchParams: { tbs: "qdr:m" },
+    };
+    return await performScrape(args.city, config);
   },
 });
 
-// =====================================
-// 2. WEEKEND EVENTS
-// =====================================
+// 2. Weekend Events
 export const scrapeWeekendEvents = action({
-  args: {},
-  handler: async (ctx) => {
-    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-
-    if (!FIRECRAWL_API_KEY) {
-      return {
-        success: true,
-        count: generateWeekendEventsData().length,
-        events: generateWeekendEventsData(),
-        source: "demo",
-      };
-    }
-
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: "weekend events Chennai parties concerts festivals",
-          location: "Chennai",
-          limit: 10,
-          tbs: "qdr:m",
-          scrapeOptions: {
-            formats: [
-              {
-                type: "json",
-                schema: {
-                  type: "object",
-                  properties: {
-                    events: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: { type: "string", description: "Event name" },
-                          date: { type: "string", description: "Event date" },
-                          venue: {
-                            type: "string",
-                            description: "Venue location",
-                          },
-                          description: {
-                            type: "string",
-                            description: "Event description",
-                          },
-                          category: {
-                            type: "string",
-                            description: "Event category",
-                          },
-                          ticketPrice: {
-                            type: "string",
-                            description: "Ticket price",
-                          },
-                        },
-                        required: ["name", "date"],
-                      },
-                    },
-                  },
-                  required: ["events"],
-                },
-                prompt:
-                  "Extract weekend event information from these Chennai event search results",
+  args: { city: v.string() },
+  handler: async (ctx, args) => {
+    const config = {
+      query: "weekend events {{city}} parties concerts festivals",
+      schema: {
+        /* Events Schema */ type: "object",
+        properties: {
+          events: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                date: { type: "string" },
+                venue: { type: "string" },
+                description: { type: "string" },
+                category: { type: "string" },
+                ticketPrice: { type: "string" },
               },
-            ],
+              required: ["name", "date"],
+            },
           },
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data?.web?.length > 0) {
-        const allEvents = [];
-
-        data.data.web.forEach((result) => {
-          if (result.json?.events && Array.isArray(result.json.events)) {
-            result.json.events.forEach((event) => {
-              allEvents.push({
-                title: event.name,
-                description:
-                  event.description || `${event.category} event in Chennai`,
-                location: event.venue || "Chennai",
-                eventDate: event.date,
-                venue: event.venue,
-                category: event.category || "Weekend Event",
-                organizer: event.organizer || "Event Organizer", // NEW
-                ticketPrice: event.ticketPrice,
-                sourceUrl:
-                  result.url ||
-                  result.sourceURL ||
-                  "https://www.eventbrite.com/d/india--chennai/events/", // NEW
-                price: event.ticketPrice || "₹500", // NEW - for AI processor
-                //contactInfo: event.contact || event.phone || undefined, // NEW
-                tags: ["weekend", "event", "chennai"],
-              });
-            });
-          } else {
-            let eventName = result.title || "Chennai Event";
-            allEvents.push({
-              title: eventName.substring(0, 50),
-              description:
-                result.description?.substring(0, 200) ||
-                "Exciting event in Chennai",
-              location: "Chennai",
-              eventDate: "TBD",
-              venue: "Various venues",
-              category: "Event",
-              sourceUrl:
-                result.url || result.sourceURL || "https://example.com", // NEW
-              price: "₹500", // NEW
-              tags: ["event", "chennai"],
-            });
-          }
-        });
-
-        if (allEvents.length > 0) {
-          return {
-            success: true,
-            count: allEvents.length,
-            events: allEvents.slice(0, 10),
-            source: "search_extracted",
-          };
-        }
-      }
-
-      throw new Error("No results from search");
-    } catch (error) {
-      return {
-        success: true,
-        count: generateWeekendEventsData().length,
-        events: generateWeekendEventsData(),
-        source: "demo_fallback",
-      };
-    }
+        },
+        required: ["events"],
+      },
+      prompt:
+        "Extract weekend event information from these {{city}} event search results",
+      dataKey: "events",
+      resultKey: "events",
+      transform: (item, result, city) => ({
+        title: item.name,
+        description: item.description || `${item.category} event in ${city}`,
+        location: item.venue || city,
+        eventDate: item.date,
+        venue: item.venue,
+        category: item.category || "Weekend Event",
+        ticketPrice: item.ticketPrice,
+        sourceUrl: result.url || result.sourceURL,
+        price: item.ticketPrice || "₹500",
+        tags: ["weekend", "event", city.toLowerCase()],
+      }),
+      fallbackTransform: (result, city) => ({
+        title: (result.title || `${city} Event`).substring(0, 50),
+        description:
+          result.description?.substring(0, 200) || `Exciting event in ${city}`,
+        location: city,
+        eventDate: "TBD",
+        venue: "Various venues",
+        category: "Event",
+        sourceUrl: result.url || result.sourceURL,
+        price: "₹500",
+        tags: ["event", city.toLowerCase()],
+      }),
+      demoDataFunction: generateWeekendEventsData,
+      searchParams: { tbs: "qdr:m" },
+    };
+    return await performScrape(args.city, config);
   },
 });
 
-// =====================================
-// 3. LOCAL NEWS
-// =====================================
+// 3. Local News
 export const scrapeLocalNews = action({
-  args: {},
-  handler: async (ctx) => {
-    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-
-    if (!FIRECRAWL_API_KEY) {
-      return {
-        success: true,
-        count: generateLocalNewsData().length,
-        news: generateLocalNewsData(),
-        source: "demo",
-      };
-    }
-
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: "Chennai news today local Tamil Nadu traffic metro",
-          location: "Chennai",
-          sources: ["news"],
-          limit: 10,
-          tbs: "qdr:d",
-          scrapeOptions: {
-            formats: [
-              {
-                type: "json",
-                schema: {
-                  type: "object",
-                  properties: {
-                    news: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          headline: {
-                            type: "string",
-                            description: "News headline",
-                          },
-                          summary: {
-                            type: "string",
-                            description: "Brief summary",
-                          },
-                          category: {
-                            type: "string",
-                            description: "News category",
-                          },
-                          publishedTime: {
-                            type: "string",
-                            description: "When published",
-                          },
-                        },
-                        required: ["headline", "summary"],
-                      },
-                    },
-                  },
-                  required: ["news"],
-                },
-                prompt:
-                  "Extract local news from these Chennai news search results",
+  args: { city: v.string() },
+  handler: async (ctx, args) => {
+    const config = {
+      query: "{{city}} news today local traffic metro",
+      schema: {
+        type: "object",
+        properties: {
+          news: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                headline: { type: "string" },
+                summary: { type: "string" },
+                category: { type: "string" },
+                publishedTime: { type: "string" },
               },
-            ],
+              required: ["headline", "summary"],
+            },
           },
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data?.web?.length > 0) {
-        const allNews = [];
-
-        data.data.web.forEach((result) => {
-          if (result.json?.news && Array.isArray(result.json.news)) {
-            result.json.news.forEach((article) => {
-              allNews.push({
-                title: article.headline,
-                description: article.summary,
-                category: article.category || "Local News",
-                publishedTime: article.publishedTime,
-                location: "Chennai",
-                source: "News Search",
-                sourceUrl:
-                  result.url ||
-                  result.sourceURL ||
-                  "https://timesofindia.indiatimes.com/city/chennai", // NEW
-                tags: ["news", "chennai", "local"],
-              });
-            });
-          } else {
-            allNews.push({
-              title: result.title || "Chennai News",
-              description:
-                result.description?.substring(0, 200) ||
-                "Local news from Chennai",
-              category: "Local News",
-              location: "Chennai",
-              source: "News Search",
-              sourceUrl:
-                result.url || result.sourceURL || "https://example.com", // NEW
-              tags: ["news", "chennai", "local"],
-            });
-          }
-        });
-
-        if (allNews.length > 0) {
-          return {
-            success: true,
-            count: allNews.length,
-            news: allNews.slice(0, 10),
-            source: "search_extracted",
-          };
-        }
-      }
-
-      throw new Error("No results from search");
-    } catch (error) {
-      return {
-        success: true,
-        count: generateLocalNewsData().length,
-        news: generateLocalNewsData(),
-        source: "demo_fallback",
-      };
-    }
+        },
+        required: ["news"],
+      },
+      prompt: "Extract local news from these {{city}} news search results",
+      dataKey: "news",
+      transform: (item: any, result: any, city: string) => ({
+        title: item.headline,
+        description: item.summary,
+        category: item.category || "Local News",
+        publishedTime: item.publishedTime,
+        location: city,
+        sourceUrl: result.url || result.sourceURL,
+        tags: ["news", city.toLowerCase(), "local"],
+      }),
+      // ADDED: The filter function to keep only relevant news
+      filter: (item: any, city: string) => {
+        const cityLower = city.toLowerCase();
+        return (
+          item.title.toLowerCase().includes(cityLower) ||
+          item.description.toLowerCase().includes(cityLower)
+        );
+      },
+      fallbackTransform: (result: any, city: string) => ({
+        title: result.title || `${city} News`,
+        description:
+          result.description?.substring(0, 200) || `Local news from ${city}`,
+        category: "Local News",
+        location: city,
+        sourceUrl: result.url || result.sourceURL,
+        tags: ["news", city.toLowerCase(), "local"],
+      }),
+      demoDataFunction: generateLocalNewsData, // Assuming this function exists
+      searchParams: { sources: ["news"], tbs: "qdr:d" },
+    };
+    return await performScrape(args.city, config);
   },
 });
 
-// =====================================
-// 4. APARTMENT HUNT
-// =====================================
+// 4. Apartment Hunt
 export const scrapeApartmentHunt = action({
-  args: {},
-  handler: async (ctx) => {
-    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-
-    if (!FIRECRAWL_API_KEY) {
-      return {
-        success: true,
-        count: generateApartmentHuntData().length,
-        apartments: generateApartmentHuntData(),
-        source: "demo",
-      };
-    }
-
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: "apartments for rent Chennai 1BHK 2BHK 3BHK rental",
-          location: "Chennai",
-          limit: 10,
-          tbs: "qdr:m",
-          scrapeOptions: {
-            formats: [
-              {
-                type: "json",
-                schema: {
-                  type: "object",
-                  properties: {
-                    apartments: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: {
-                            type: "string",
-                            description: "Property name",
-                          },
-                          location: {
-                            type: "string",
-                            description: "Area in Chennai",
-                          },
-                          rent: { type: "string", description: "Monthly rent" },
-                          bedrooms: {
-                            type: "string",
-                            description: "Number of bedrooms",
-                          },
-                          area: {
-                            type: "string",
-                            description: "Square feet area",
-                          },
-                          amenities: {
-                            type: "string",
-                            description: "Key amenities",
-                          },
-                          description: {
-                            type: "string",
-                            description: "Property description",
-                          },
-                        },
-                        required: ["name", "location", "rent"],
-                      },
-                    },
-                  },
-                  required: ["apartments"],
-                },
-                prompt:
-                  "Extract apartment rental information from these Chennai apartment search results",
+  args: { city: v.string() },
+  handler: async (ctx, args) => {
+    const config = {
+      query: "apartments for rent {{city}} 1BHK 2BHK 3BHK rental",
+      schema: {
+        /* Apartments Schema */ type: "object",
+        properties: {
+          apartments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                location: { type: "string" },
+                rent: { type: "string" },
+                bedrooms: { type: "string" },
+                area: { type: "string" },
+                amenities: { type: "string" },
+                description: { type: "string" },
               },
-            ],
+              required: ["name", "location", "rent"],
+            },
           },
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data?.web?.length > 0) {
-        const allApartments = [];
-
-        data.data.web.forEach((result) => {
-          if (
-            result.json?.apartments &&
-            Array.isArray(result.json.apartments)
-          ) {
-            result.json.apartments.forEach((apt) => {
-              allApartments.push({
-                title: apt.name,
-                description:
-                  apt.description ||
-                  `${apt.bedrooms} apartment in ${apt.location}`,
-                location: apt.location,
-                rent: apt.rent,
-                bedrooms: apt.bedrooms,
-                area: apt.area,
-                amenities: apt.amenities,
-                sourceUrl:
-                  result.url ||
-                  result.sourceURL ||
-                  "https://www.99acres.com/rent/residential-property/chennai", // NEW
-                price: apt.rent || "₹25,000/month", // NEW - for AI processor
-                //contactInfo: apt.contact || apt.phone || undefined, // NEW
-                tags: ["apartment", "rental", "chennai"],
-              });
-            });
-          } else {
-            allApartments.push({
-              title: result.title || "Chennai Apartment",
-              description:
-                result.description?.substring(0, 200) ||
-                "Apartment for rent in Chennai",
-              location: "Chennai",
-              rent: "₹25,000/month",
-              bedrooms: "2BHK",
-              area: "1200 sq ft",
-              sourceUrl:
-                result.url || result.sourceURL || "https://example.com", // NEW
-              price: "₹25,000/month", // NEW
-              tags: ["apartment", "rental", "chennai"],
-            });
-          }
-        });
-
-        if (allApartments.length > 0) {
-          return {
-            success: true,
-            count: allApartments.length,
-            apartments: allApartments.slice(0, 10),
-            source: "search_extracted",
-          };
-        }
-      }
-
-      throw new Error("No results from search");
-    } catch (error) {
-      return {
-        success: true,
-        count: generateApartmentHuntData().length,
-        apartments: generateApartmentHuntData(),
-        source: "demo_fallback",
-      };
-    }
+        },
+        required: ["apartments"],
+      },
+      prompt:
+        "Extract apartment rental information from these {{city}} apartment search results",
+      dataKey: "apartments",
+      resultKey: "apartments",
+      transform: (item, result, city) => ({
+        title: item.name,
+        description:
+          item.description || `${item.bedrooms} apartment in ${item.location}`,
+        location: item.location || city,
+        rent: item.rent,
+        bedrooms: item.bedrooms,
+        area: item.area,
+        amenities: item.amenities,
+        sourceUrl: result.url || result.sourceURL,
+        price: item.rent || "Contact for price",
+        tags: ["apartment", "rental", city.toLowerCase()],
+      }),
+      fallbackTransform: (result, city) => ({
+        title: result.title || `${city} Apartment`,
+        description:
+          result.description?.substring(0, 200) ||
+          `Apartment for rent in ${city}`,
+        location: city,
+        rent: "Contact for price",
+        bedrooms: "2BHK",
+        area: "1200 sq ft",
+        sourceUrl: result.url || result.sourceURL,
+        price: "Contact for price",
+        tags: ["apartment", "rental", city.toLowerCase()],
+      }),
+      demoDataFunction: generateApartmentHuntData,
+      searchParams: { tbs: "qdr:m" },
+    };
+    return await performScrape(args.city, config);
   },
 });
 
-// =====================================
-// 5. TECH MEETUPS
-// =====================================
+// 5. Tech Meetups
 export const scrapeTechMeetups = action({
-  args: {},
-  handler: async (ctx) => {
-    const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-
-    if (!FIRECRAWL_API_KEY) {
-      return {
-        success: true,
-        count: generateTechMeetupsData().length,
-        meetups: generateTechMeetupsData(),
-        source: "demo",
-      };
-    }
-
-    try {
-      const response = await fetch("https://api.firecrawl.dev/v2/search", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: "tech meetups Chennai developer events programming",
-          location: "Chennai",
-          categories: ["github"],
-          limit: 10,
-          tbs: "qdr:m",
-          scrapeOptions: {
-            formats: [
-              {
-                type: "json",
-                schema: {
-                  type: "object",
-                  properties: {
-                    meetups: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: { type: "string", description: "Meetup name" },
-                          date: { type: "string", description: "Event date" },
-                          venue: {
-                            type: "string",
-                            description: "Venue location",
-                          },
-                          topic: { type: "string", description: "Tech topic" },
-                          description: {
-                            type: "string",
-                            description: "Event description",
-                          },
-                          type: { type: "string", description: "Event type" },
-                          organizer: {
-                            type: "string",
-                            description: "Organizing group",
-                          },
-                        },
-                        required: ["name", "date", "topic"],
-                      },
-                    },
-                  },
-                  required: ["meetups"],
-                },
-                prompt:
-                  "Extract tech meetup information from these Chennai developer event search results",
+  args: { city: v.string() },
+  handler: async (ctx, args) => {
+    const config = {
+      query: "tech meetups {{city}} developer events programming",
+      schema: {
+        /* Meetups Schema */ type: "object",
+        properties: {
+          meetups: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                date: { type: "string" },
+                venue: { type: "string" },
+                topic: { type: "string" },
+                description: { type: "string" },
+                type: { type: "string" },
+                organizer: { type: "string" },
               },
-            ],
+              required: ["name", "date", "topic"],
+            },
           },
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data?.web?.length > 0) {
-        const allMeetups = [];
-
-        data.data.web.forEach((result) => {
-          if (result.json?.meetups && Array.isArray(result.json.meetups)) {
-            result.json.meetups.forEach((meetup) => {
-              allMeetups.push({
-                title: meetup.name,
-                description:
-                  meetup.description ||
-                  `${meetup.topic} ${meetup.type} in Chennai`,
-                location: "Chennai",
-                eventDate: meetup.date,
-                venue: meetup.venue,
-                topic: meetup.topic,
-                type: meetup.type || "Tech Meetup",
-                organizer: meetup.organizer || "Tech Community",
-                sourceUrl:
-                  result.url ||
-                  result.sourceURL ||
-                  "https://gdg.community.dev/gdg-chennai/", // NEW
-                price: "Free", // NEW - most tech meetups are free
-                //contactInfo: meetup.contact || null, // NEW
-                tags: ["tech", "meetup", "chennai", "developer"],
-              });
-            });
-          } else {
-            allMeetups.push({
-              title: result.title || "Chennai Tech Meetup",
-              description:
-                result.description?.substring(0, 200) ||
-                "Tech meetup in Chennai",
-              location: "Chennai",
-              eventDate: "TBD",
-              venue: "TBD",
-              topic: "Technology",
-              type: "Meetup",
-              organizer: "Tech Community", // NEW
-              sourceUrl:
-                result.url || result.sourceURL || "https://example.com", // NEW
-              price: "Free", // NEW
-              tags: ["tech", "meetup", "chennai"],
-            });
-          }
-        });
-
-        if (allMeetups.length > 0) {
-          return {
-            success: true,
-            count: allMeetups.length,
-            meetups: allMeetups.slice(0, 10),
-            source: "search_extracted",
-          };
-        }
-      }
-
-      throw new Error("No results from search");
-    } catch (error) {
-      return {
-        success: true,
-        count: generateTechMeetupsData().length,
-        meetups: generateTechMeetupsData(),
-        source: "demo_fallback",
-      };
-    }
+        },
+        required: ["meetups"],
+      },
+      prompt:
+        "Extract tech meetup information from these {{city}} developer event search results",
+      dataKey: "meetups",
+      resultKey: "meetups",
+      transform: (item, result, city) => ({
+        title: item.name,
+        description:
+          item.description || `${item.topic} ${item.type} in ${city}`,
+        location: city,
+        eventDate: item.date,
+        venue: item.venue,
+        topic: item.topic,
+        organizer: item.organizer || "Tech Community",
+        sourceUrl: result.url || result.sourceURL,
+        price: "Free",
+        tags: ["tech", "meetup", city.toLowerCase(), "developer"],
+      }),
+      fallbackTransform: (result, city) => ({
+        title: result.title || `${city} Tech Meetup`,
+        description:
+          result.description?.substring(0, 200) || `Tech meetup in ${city}`,
+        location: city,
+        eventDate: "TBD",
+        venue: "TBD",
+        topic: "Technology",
+        organizer: "Tech Community",
+        sourceUrl: result.url || result.sourceURL,
+        price: "Free",
+        tags: ["tech", "meetup", city.toLowerCase()],
+      }),
+      demoDataFunction: generateTechMeetupsData,
+      searchParams: { tbs: "qdr:m" },
+    };
+    return await performScrape(args.city, config);
   },
 });
 
 // =====================================
-// DEMO DATA GENERATION FUNCTIONS
+// GENERIC DEMO DATA FUNCTIONS
 // =====================================
-function generateChennaiRestaurantData() {
+function generateRestaurantData(city) {
   return [
     {
-      title: "Murugan Idli Shop",
-      description: "Famous for soft idlis and filter coffee",
-      location: "T. Nagar, Chennai",
+      title: `Famous Idli Shop in ${city}`,
+      description: "Authentic South Indian breakfast",
+      location: `A popular area, ${city}`,
       cuisine: "South Indian",
-      rating: 4.3,
+      rating: 4.5,
       priceRange: "₹",
-      sourceUrl: "https://www.zomato.com/chennai/murugan-idli-shop", // NEW
-      price: "₹100-200 per person", // NEW
-      contactInfo: "044-12345678", // NEW
-      tags: ["breakfast", "traditional", "vegetarian"],
+      tags: ["restaurant", city.toLowerCase()],
     },
     {
-      title: "Buhari Hotel",
-      description: "Legendary biryani destination since 1951",
-      location: "Anna Salai, Chennai",
-      cuisine: "Indian",
-      rating: 4.1,
+      title: `Legendary Biryani in ${city}`,
+      description: "Known for its rich and aromatic biryani",
+      location: `City center, ${city}`,
+      cuisine: "Mughlai",
+      rating: 4.8,
       priceRange: "₹₹",
-      sourceUrl: "https://www.zomato.com/chennai/buhari-hotel", // NEW
-      price: "₹300-500 per person", // NEW
-      contactInfo: "044-87654321", // NEW
-      tags: ["biryani", "historic", "non-vegetarian"],
+      tags: ["restaurant", city.toLowerCase()],
     },
   ];
 }
 
-function generateWeekendEventsData() {
+function generateWeekendEventsData(city) {
   return [
     {
-      title: "Chennai Music Festival",
-      description: "Classical music performances across the city",
-      location: "Chennai",
-      eventDate: "Dec 2025",
-      venue: "Music Academy",
+      title: `Music Festival in ${city}`,
+      description: "Featuring local and national artists",
+      location: `Main Auditorium, ${city}`,
+      eventDate: "This Saturday",
       category: "Music",
-      organizer: "Chennai Music Academy", // NEW
-      ticketPrice: "₹500-2000", // NEW
-      sourceUrl: "https://www.chennaimusic.org/festival", // NEW
-      price: "₹500-2000", // NEW - for AI processor
-      contactInfo: "044-28117162", // NEW
-      tags: ["weekend", "event", "chennai"],
+      price: "₹1000",
+      tags: ["event", city.toLowerCase()],
     },
     {
-      title: "Chennai Book Fair",
-      description:
-        "Annual book fair with thousands of titles and author interactions",
-      location: "Chennai",
-      eventDate: "Jan 2026",
-      venue: "YMCA Nandanam",
-      category: "Literature",
-      organizer: "Booksellers & Publishers Association", // NEW
-      ticketPrice: "₹30 entry", // NEW
-      sourceUrl: "https://www.chennaibookfair.com", // NEW
-      price: "₹30 entry", // NEW
-      contactInfo: "044-24332371", // NEW
-      tags: ["weekend", "event", "chennai", "books"],
-    },
-    {
-      title: "Marina Beach Food Festival",
-      description:
-        "Street food festival featuring Chennai's best local cuisine",
-      location: "Chennai",
-      eventDate: "Weekend in Feb 2026",
-      venue: "Marina Beach",
+      title: `Food Carnival ${city}`,
+      description: "Experience the best street food",
+      location: `Exhibition Grounds, ${city}`,
+      eventDate: "This Weekend",
       category: "Food",
-      organizer: "Chennai Corporation", // NEW
-      ticketPrice: "Free entry", // NEW
-      sourceUrl: "https://www.chennaicorporation.gov.in/events", // NEW
-      price: "Free entry", // NEW
-      contactInfo: "044-25619111", // NEW
-      tags: ["weekend", "event", "chennai", "food"],
+      price: "Free Entry",
+      tags: ["event", city.toLowerCase()],
     },
   ];
 }
 
-function generateLocalNewsData() {
+function generateLocalNewsData(city) {
   return [
     {
-      title: "Chennai Metro Expansion Update",
-      description:
-        "New metro line construction progress in OMR and Kilpauk corridors",
+      title: `${city} Metro Phase 2 Update`,
+      description: "New line to connect the airport is nearing completion.",
       category: "Infrastructure",
-      location: "Chennai",
-      source: "Demo Data",
-      sourceUrl:
-        "https://www.thehindu.com/news/cities/chennai/metro-expansion-update", // NEW
-      publishedTime: "2 hours ago", // NEW
-      tags: ["news", "chennai", "local"],
+      location: city,
+      publishedTime: "3 hours ago",
+      tags: ["news", city.toLowerCase()],
     },
     {
-      title: "New IT Park Opens in Sholinganallur",
-      description:
-        "State-of-the-art IT park with capacity for 10,000 employees inaugurated",
-      category: "Business",
-      location: "Chennai",
-      source: "Demo Data",
-      sourceUrl: "https://www.timesofinda.com/chennai/it-park-sholinganallur", // NEW
-      publishedTime: "1 hour ago", // NEW
-      tags: ["news", "chennai", "local", "it"],
-    },
-    {
-      title: "Chennai Traffic Police Launch New Mobile App",
-      description:
-        "Citizens can now pay fines and check vehicle registration through mobile app",
-      category: "Technology",
-      location: "Chennai",
-      source: "Demo Data",
-      sourceUrl: "https://www.newindianexpress.com/chennai-traffic-police-app", // NEW
-      publishedTime: "4 hours ago", // NEW
-      tags: ["news", "chennai", "local", "traffic"],
+      title: `Traffic Diversions in ${city} This Weekend`,
+      description: "Major roads closed for a marathon event.",
+      category: "Traffic",
+      location: city,
+      publishedTime: "1 day ago",
+      tags: ["news", city.toLowerCase()],
     },
   ];
 }
 
-function generateApartmentHuntData() {
+function generateApartmentHuntData(city) {
   return [
     {
-      title: "Modern 2BHK Apartment",
-      description:
-        "Fully furnished apartment in prime location with all modern amenities",
-      location: "T. Nagar, Chennai",
-      rent: "₹25,000/month",
+      title: `Modern 2BHK in ${city}`,
+      description: "Apartment in a prime location with modern amenities.",
+      location: `Near Tech Park, ${city}`,
+      rent: "₹30,000/month",
       bedrooms: "2BHK",
-      area: "1200 sq ft",
-      amenities: "Gym, Swimming Pool, 24/7 Security, Parking", // NEW
-      sourceUrl: "https://www.99acres.com/rent/2bhk-apartment-t-nagar-chennai", // NEW
-      price: "₹25,000/month", // NEW - for AI processor
-      contactInfo: "9841234567", // NEW
-      furnishing: "Fully Furnished", // NEW
-      tags: ["apartment", "rental", "chennai"],
+      price: "₹30,000/month",
+      tags: ["apartment", city.toLowerCase()],
     },
     {
-      title: "Spacious 3BHK Villa",
-      description:
-        "Independent villa with garden and parking in quiet residential area",
-      location: "Adyar, Chennai",
-      rent: "₹45,000/month",
+      title: `Spacious 3BHK Villa in ${city}`,
+      description: "Independent villa with a garden in a quiet area.",
+      location: `Suburb, ${city}`,
+      rent: "₹65,000/month",
       bedrooms: "3BHK",
-      area: "1800 sq ft",
-      amenities: "Garden, Parking, Power Backup, Water Supply", // NEW
-      sourceUrl: "https://www.magicbricks.com/rent/3bhk-villa-adyar-chennai", // NEW
-      price: "₹45,000/month", // NEW
-      contactInfo: "9876543210", // NEW
-      furnishing: "Semi Furnished", // NEW
-      tags: ["apartment", "rental", "chennai", "villa"],
-    },
-    {
-      title: "Budget 1BHK Near IT Corridor",
-      description:
-        "Affordable apartment perfect for working professionals in OMR",
-      location: "OMR, Chennai",
-      rent: "₹15,000/month",
-      bedrooms: "1BHK",
-      area: "600 sq ft",
-      amenities: "Lift, Security, Parking", // NEW
-      sourceUrl: "https://www.housing.com/rent/1bhk-apartment-omr-chennai", // NEW
-      price: "₹15,000/month", // NEW
-      contactInfo: "8765432109", // NEW
-      furnishing: "Unfurnished", // NEW
-      tags: ["apartment", "rental", "chennai", "budget"],
+      price: "₹65,000/month",
+      tags: ["apartment", city.toLowerCase()],
     },
   ];
 }
 
-function generateTechMeetupsData() {
+function generateTechMeetupsData(city) {
   return [
     {
-      title: "GDG Chennai Monthly Meetup",
-      description:
-        "Latest in Google technologies and web development with hands-on workshops",
-      location: "Chennai",
-      eventDate: "Every first Saturday",
-      venue: "PayPal Office, OMR",
+      title: `GDG ${city} Monthly Meetup`,
+      description: "Talks on the latest in Google technologies.",
+      location: city,
+      eventDate: "First Saturday of the month",
       topic: "Web Development",
-      type: "Meetup",
-      organizer: "Google Developer Group Chennai", // NEW
-      sourceUrl: "https://gdg.community.dev/gdg-chennai/", // NEW
-      price: "Free", // NEW - for AI processor
-      contactInfo: "gdgchennai@gmail.com", // NEW
-      tags: ["tech", "meetup", "chennai", "developer"],
+      price: "Free",
+      tags: ["tech", city.toLowerCase()],
     },
     {
-      title: "React Chennai Meetup",
-      description:
-        "Monthly gathering for React developers to share knowledge and network",
-      location: "Chennai",
-      eventDate: "Every third Saturday",
-      venue: "Zoho Office, Estancia IT Park",
-      topic: "React, Frontend Development",
-      type: "Meetup",
-      organizer: "React Chennai Community", // NEW
-      sourceUrl: "https://www.meetup.com/react-chennai/", // NEW
-      price: "Free", // NEW
-      contactInfo: "reactchennai@gmail.com", // NEW
-      tags: ["tech", "meetup", "chennai", "react", "frontend"],
-    },
-    {
-      title: "Chennai Python User Group",
-      description:
-        "Python enthusiasts gathering for talks, workshops and networking",
-      location: "Chennai",
-      eventDate: "Every second Saturday",
-      venue: "Microsoft Office, RMZ Millenia",
-      topic: "Python, Data Science, AI/ML",
-      type: "User Group",
-      organizer: "Chennai Python User Group", // NEW
-      sourceUrl: "https://www.meetup.com/chennai-python-user-group/", // NEW
-      price: "Free", // NEW
-      contactInfo: "chennaipug@gmail.com", // NEW
-      tags: ["tech", "meetup", "chennai", "python", "data-science"],
+      title: `${city} AI/ML Hub`,
+      description: "Deep dive into machine learning models.",
+      location: city,
+      eventDate: "Third Friday of the month",
+      topic: "AI/ML",
+      price: "Free",
+      tags: ["tech", city.toLowerCase()],
     },
   ];
 }

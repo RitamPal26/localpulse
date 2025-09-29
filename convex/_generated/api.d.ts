@@ -9,7 +9,6 @@
  */
 
 import type * as actions_aiProcessor from "../actions/aiProcessor.js";
-import type * as actions_geocoder from "../actions/geocoder.js";
 import type * as actions_scraper from "../actions/scraper.js";
 import type * as auth from "../auth.js";
 import type * as collections from "../collections.js";
@@ -37,7 +36,6 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   "actions/aiProcessor": typeof actions_aiProcessor;
-  "actions/geocoder": typeof actions_geocoder;
   "actions/scraper": typeof actions_scraper;
   auth: typeof auth;
   collections: typeof collections;

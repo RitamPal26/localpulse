@@ -31,15 +31,16 @@ export const createCollection = mutation({
   },
 });
 
-// Save an item to a collection (or create default collection)
 export const saveToCollection = mutation({
   args: {
-    itemId: v.string(), // For now, we'll use mock data IDs
-    collectionName: v.optional(v.string()),
+    itemId: v.id("pulseContent"),
+    collectionName: v.string(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Not authenticated");
+    if (!identity) {
+      throw new ConvexError("Not authenticated");
+    }
 
     const user = await ctx.db
       .query("users")
@@ -47,38 +48,43 @@ export const saveToCollection = mutation({
         q.eq("tokenIdentifier", identity.tokenIdentifier)
       )
       .unique();
+      
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
 
-    if (!user) throw new ConvexError("User not found");
-
-    const collectionName = args.collectionName || "Saved Items";
-
-    // Find or create the collection
+    // Find a collection with the given name for the current user
     let collection = await ctx.db
       .query("collections")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("name"), collectionName))
+      .filter((q) => q.eq(q.field("name"), args.collectionName))
       .first();
 
+    // If the collection doesn't exist, create it
     if (!collection) {
-      // Create new collection
       const collectionId = await ctx.db.insert("collections", {
+        name: args.collectionName,
         userId: user._id,
-        name: collectionName,
-        items: [args.itemId],
+        items: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
-      return collectionId;
+      collection = await ctx.db.get(collectionId);
+    }
+    
+    if (!collection) {
+        throw new ConvexError("Could not find or create collection");
+    }
+
+    // Add the item to the collection if it's not already there
+    if (!collection.items.includes(args.itemId)) {
+      await ctx.db.patch(collection._id, {
+        items: [...collection.items, args.itemId],
+        updatedAt: Date.now(),
+      });
+      return { success: true, message: "Item saved!" };
     } else {
-      // Add to existing collection (avoid duplicates)
-      const currentItems = collection.items || [];
-      if (!currentItems.includes(args.itemId)) {
-        await ctx.db.patch(collection._id, {
-          items: [...currentItems, args.itemId],
-          updatedAt: Date.now(),
-        });
-      }
-      return collection._id;
+      return { success: true, message: "Item already in collection." };
     }
   },
 });

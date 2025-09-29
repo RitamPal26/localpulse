@@ -1,25 +1,24 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 
 const mapContentItem = (item: Doc<"pulseContent">) => ({
-    id: item._id,
-    pulseId: item.pulseId,
-    title: item.title,
-    description: item.aiSummary || item.description,
-    source: item.source,
-    sourceUrl: item.sourceUrl,
-    scrapedAt: item.scrapedAt,
-    location: item.location,
-    tags: item.tags,
-    contentType: item.contentType,
-    cuisine: item.cuisine,
-    priceRange: item.priceRange,
-    rating: item.rating,
-    // Add any other fields you want to pass to the frontend
-    pulseIcon: getPulseIcon(item.pulseId),
-    pulseColor: getPulseColor(item.pulseId),
-    timeAgo: getTimeAgo(item.scrapedAt),
+  id: item._id,
+  pulseId: item.pulseId,
+  title: item.title,
+  description: item.aiSummary || item.description,
+  source: item.source,
+  sourceUrl: item.sourceUrl,
+  scrapedAt: item.scrapedAt,
+  location: item.location,
+  tags: item.tags,
+  contentType: item.contentType,
+  cuisine: item.cuisine,
+  priceRange: item.priceRange,
+  rating: item.rating,
+  pulseIcon: getPulseIcon(item.pulseId),
+  pulseColor: getPulseColor(item.pulseId),
+  timeAgo: getTimeAgo(item.scrapedAt),
 });
 
 // Save user's pulse preferences during onboarding
@@ -125,40 +124,11 @@ export const hasCompletedOnboarding = query({
   },
 });
 
-export const getFeedContent = query({
-  args: {},
-  handler: async (ctx) => {
-    console.log("getFeedContent called");
-
+export const saveUserCity = mutation({
+  args: { city: v.string() },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    console.log("Identity:", !!identity);
-
-    if (!identity) {
-      console.log("No identity, returning all content");
-      // For testing, return all content if no auth
-      const allContent = await ctx.db.query("pulseContent").collect();
-      console.log("All content count:", allContent.length);
-      return allContent
-        .map((item) => ({
-          id: item._id,
-          pulseId: item.pulseId,
-          title: item.title,
-          description: item.aiSummary || item.description,
-          source: item.source,
-          sourceUrl: item.sourceUrl,
-          scrapedAt: item.scrapedAt,
-          location: item.location,
-          tags: item.tags,
-          pulseIcon: getPulseIcon(item.pulseId),
-          pulseColor: getPulseColor(item.pulseId),
-          timeAgo: getTimeAgo(item.scrapedAt),
-          contentType: item.contentType,
-          cuisine: item.cuisine,
-          priceRange: item.priceRange,
-          rating: item.rating,
-        }))
-        .sort((a, b) => b.scrapedAt - a.scrapedAt);
-    }
+    if (!identity) throw new Error("Not authenticated");
 
     const user = await ctx.db
       .query("users")
@@ -167,83 +137,74 @@ export const getFeedContent = query({
       )
       .unique();
 
-    console.log("User found:", !!user);
+    if (!user) throw new Error("User not found");
 
-    if (!user) {
-      console.log("No user found, returning all content");
-      const allContent = await ctx.db.query("pulseContent").collect();
-      return allContent
-        .map((item) => ({
-          id: item._id,
-          pulseId: item.pulseId,
-          title: item.title,
-          description: item.aiSummary || item.description,
-          source: item.source,
-          sourceUrl: item.sourceUrl,
-          scrapedAt: item.scrapedAt,
-          location: item.location,
-          tags: item.tags,
-          pulseIcon: getPulseIcon(item.pulseId),
-          pulseColor: getPulseColor(item.pulseId),
-          timeAgo: getTimeAgo(item.scrapedAt),
-          contentType: item.contentType,
-          cuisine: item.cuisine,
-          priceRange: item.priceRange,
-          rating: item.rating,
-        }))
-        .sort((a, b) => b.scrapedAt - a.scrapedAt);
-    }
-
-    const userPulses = await ctx.db
-      .query("userPulsePreferences")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .unique();
-
-    console.log("User pulses:", userPulses?.selectedPulses);
-
-    const allContent = await ctx.db.query("pulseContent").collect();
-    console.log("Total content in DB:", allContent.length);
-
-    let filteredContent = allContent;
-    if (userPulses?.selectedPulses) {
-      filteredContent = allContent.filter((item) =>
-        userPulses.selectedPulses.includes(item.pulseId)
-      );
-      console.log("Filtered content count:", filteredContent.length);
-    }
-
-    return filteredContent
-      .map((item) => ({
-        id: item._id,
-        pulseId: item.pulseId,
-        title: item.title,
-        description: item.aiSummary || item.description,
-        source: item.source,
-        sourceUrl: item.sourceUrl,
-        scrapedAt: item.scrapedAt,
-        location: item.location,
-        tags: item.tags,
-        pulseIcon: getPulseIcon(item.pulseId),
-        pulseColor: getPulseColor(item.pulseId),
-        timeAgo: getTimeAgo(item.scrapedAt),
-        contentType: item.contentType,
-        cuisine: item.cuisine,
-        priceRange: item.priceRange,
-        rating: item.rating,
-      }))
-      .sort((a, b) => b.scrapedAt - a.scrapedAt);
+    return await ctx.db.patch(user._id, { city: args.city });
   },
 });
 
-// Add this temporary debug query
-export const getRawFeedContent = query({
-  args: {},
-  handler: async (ctx) => {
-    // Get ALL content without any filtering
-    const allContent = await ctx.db.query("pulseContent").collect();
-    console.log("Raw content count:", allContent.length);
-    console.log("Sample item:", allContent[0]);
-    return allContent;
+export const getFeedContent = query({
+  args: {
+    city: v.optional(v.string()),
+    // ADDED: Allow the app to specify which pulse types to show
+    selectedPulses: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    // 1. Determine the city to filter by
+    let cityToFilter = args.city;
+    let pulsesToFilter = args.selectedPulses;
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (identity) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier)
+        )
+        .unique();
+
+      // If no city is passed, use the user's saved city as a default
+      if (!cityToFilter && user?.city) {
+        cityToFilter = user.city;
+      }
+
+      // If no pulse preferences are passed, use the user's saved preferences
+      if (!pulsesToFilter) {
+        const userPrefs = await ctx.db
+          .query("userPulsePreferences")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .first();
+        if (userPrefs?.selectedPulses && userPrefs.selectedPulses.length > 0) {
+          pulsesToFilter = userPrefs.selectedPulses;
+        }
+      }
+    }
+
+    // 2. Fetch all content for the selected city (this is fast)
+    let contentQuery;
+    if (cityToFilter) {
+      contentQuery = ctx.db
+        .query("pulseContent")
+        .withIndex("by_city", (q) => q.eq("city", cityToFilter));
+    } else {
+      // Fallback if no city is known
+      contentQuery = ctx.db.query("pulseContent");
+    }
+
+    // Get all items for the city, ordered by most recent
+    const cityContent = await contentQuery.order("desc").collect();
+
+    // 3. Filter the city's content by pulse preferences
+    if (pulsesToFilter && pulsesToFilter.length > 0) {
+      const filteredContent = cityContent.filter((item) =>
+        pulsesToFilter.includes(item.pulseId)
+      );
+      // Return content for the city that ALSO matches the user's preferences
+      return filteredContent.map(mapContentItem);
+    }
+
+    // If no preferences, return all content for that city
+    return cityContent.map(mapContentItem);
   },
 });
 
@@ -273,9 +234,7 @@ export const addPulseContent = mutation({
     area: v.optional(v.string()),
     amenities: v.optional(v.string()),
     furnishing: v.optional(v.string()),
-    //contactInfo: v.optional(v.string()),
-
-    // NEW: Add enhanced AI fields
+    city: v.string(),
     highlights: v.optional(v.array(v.string())),
     callToAction: v.optional(v.string()),
     localContext: v.optional(v.string()),
@@ -296,7 +255,17 @@ export const getPulseContentById = query({
       return null;
     }
     // Reuse the mapping logic to keep the data shape consistent
-    return mapContentItem(content); 
+    return mapContentItem(content);
+  },
+});
+
+export const deleteAllPulseContent = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allContent = await ctx.db.query("pulseContent").collect();
+    const deletePromises = allContent.map((doc) => ctx.db.delete(doc._id));
+    await Promise.all(deletePromises);
+    console.log(`🗑️ Cleared ${allContent.length} items.`);
   },
 });
 
