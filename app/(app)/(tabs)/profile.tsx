@@ -213,11 +213,6 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Settings</Text>
 
           <TouchableOpacity style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Notifications</Text>
-            <Text style={styles.settingValue}>Coming Soon</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingItem}>
             <Text style={styles.settingLabel}>Data & Privacy</Text>
             <Text style={styles.settingValue}>→</Text>
           </TouchableOpacity>

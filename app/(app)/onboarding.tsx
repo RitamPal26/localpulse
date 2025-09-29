@@ -65,7 +65,7 @@ export default function OnboardingScreen() {
           <Text style={styles.confirmationIcon}>🎉</Text>
           <Text style={styles.confirmationTitle}>All Set!</Text>
           <Text style={styles.confirmationSubtitle}>
-            Your LocalPulse feed is being personalized...
+            Your ChennaiPulse feed is being personalized...
           </Text>
           <View style={styles.selectedPulsesPreview}>
             {selectedPulses.map((pulseId) => {
@@ -92,7 +92,7 @@ export default function OnboardingScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome to LocalPulse! 👋</Text>
+          <Text style={styles.title}>Welcome to ChennaiPulse! 👋</Text>
           <Text style={styles.subtitle}>
             Choose what you&apos;d like to discover in Chennai. You can always
             change these later.
@@ -161,7 +161,7 @@ export default function OnboardingScreen() {
             <ActivityIndicator color="white" />
           ) : (
             <Text style={styles.completeButtonText}>
-              Start My LocalPulse Journey
+              Start My ChennaiPulse Journey
             </Text>
           )}
         </TouchableOpacity>

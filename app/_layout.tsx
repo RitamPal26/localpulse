@@ -14,6 +14,7 @@ export default function RootLayout() {
     <ConvexBetterAuthProvider client={convex} authClient={authClient}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
         <Stack.Screen name="sign-in" />
         <Stack.Screen name="sign-up" />
         <Stack.Screen name="(app)" options={{ headerShown: false }} />

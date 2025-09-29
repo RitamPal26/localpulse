@@ -30,7 +30,7 @@ export const scrapeChennaiRestaurants = action({
         body: JSON.stringify({
           query: "best restaurants Chennai food dining 2025",
           location: "Chennai",
-          limit: 12,
+          limit: 10,
           tbs: "qdr:m",
           scrapeOptions: {
             formats: [
@@ -100,6 +100,12 @@ export const scrapeChennaiRestaurants = action({
                 cuisine: restaurant.cuisine || "Various",
                 rating: restaurant.rating || Math.random() * 1.5 + 3.5,
                 priceRange: restaurant.priceRange || "₹₹",
+                sourceUrl:
+                  result.url ||
+                  result.sourceURL ||
+                  "https://www.tripadvisor.in/Restaurants-g304556-Chennai.html", // NEW
+                price: restaurant.priceRange || "₹300-500 per person", // NEW - for AI processor
+                //contactInfo: restaurant.phone || restaurant.contact || undefined, // NEW
                 tags: ["restaurant", "chennai"],
               });
             });
@@ -118,6 +124,9 @@ export const scrapeChennaiRestaurants = action({
               cuisine: "Various",
               rating: Math.random() * 1.5 + 3.5,
               priceRange: "₹₹",
+              sourceUrl:
+                result.url || result.sourceURL || "https://example.com", // NEW
+              price: "₹300-500 per person", // NEW
               tags: ["restaurant", "chennai"],
             });
           }
@@ -127,7 +136,7 @@ export const scrapeChennaiRestaurants = action({
           return {
             success: true,
             count: allRestaurants.length,
-            restaurants: allRestaurants.slice(0, 12),
+            restaurants: allRestaurants.slice(0, 10),
             source: "search_extracted",
           };
         }
@@ -231,11 +240,18 @@ export const scrapeWeekendEvents = action({
                 title: event.name,
                 description:
                   event.description || `${event.category} event in Chennai`,
-                location: "Chennai",
+                location: event.venue || "Chennai",
                 eventDate: event.date,
                 venue: event.venue,
                 category: event.category || "Weekend Event",
+                organizer: event.organizer || "Event Organizer", // NEW
                 ticketPrice: event.ticketPrice,
+                sourceUrl:
+                  result.url ||
+                  result.sourceURL ||
+                  "https://www.eventbrite.com/d/india--chennai/events/", // NEW
+                price: event.ticketPrice || "₹500", // NEW - for AI processor
+                //contactInfo: event.contact || event.phone || undefined, // NEW
                 tags: ["weekend", "event", "chennai"],
               });
             });
@@ -250,6 +266,9 @@ export const scrapeWeekendEvents = action({
               eventDate: "TBD",
               venue: "Various venues",
               category: "Event",
+              sourceUrl:
+                result.url || result.sourceURL || "https://example.com", // NEW
+              price: "₹500", // NEW
               tags: ["event", "chennai"],
             });
           }
@@ -259,7 +278,7 @@ export const scrapeWeekendEvents = action({
           return {
             success: true,
             count: allEvents.length,
-            events: allEvents,
+            events: allEvents.slice(0, 10),
             source: "search_extracted",
           };
         }
@@ -365,6 +384,10 @@ export const scrapeLocalNews = action({
                 publishedTime: article.publishedTime,
                 location: "Chennai",
                 source: "News Search",
+                sourceUrl:
+                  result.url ||
+                  result.sourceURL ||
+                  "https://timesofindia.indiatimes.com/city/chennai", // NEW
                 tags: ["news", "chennai", "local"],
               });
             });
@@ -377,6 +400,8 @@ export const scrapeLocalNews = action({
               category: "Local News",
               location: "Chennai",
               source: "News Search",
+              sourceUrl:
+                result.url || result.sourceURL || "https://example.com", // NEW
               tags: ["news", "chennai", "local"],
             });
           }
@@ -386,7 +411,7 @@ export const scrapeLocalNews = action({
           return {
             success: true,
             count: allNews.length,
-            news: allNews,
+            news: allNews.slice(0, 10),
             source: "search_extracted",
           };
         }
@@ -506,6 +531,12 @@ export const scrapeApartmentHunt = action({
                 bedrooms: apt.bedrooms,
                 area: apt.area,
                 amenities: apt.amenities,
+                sourceUrl:
+                  result.url ||
+                  result.sourceURL ||
+                  "https://www.99acres.com/rent/residential-property/chennai", // NEW
+                price: apt.rent || "₹25,000/month", // NEW - for AI processor
+                //contactInfo: apt.contact || apt.phone || undefined, // NEW
                 tags: ["apartment", "rental", "chennai"],
               });
             });
@@ -519,6 +550,9 @@ export const scrapeApartmentHunt = action({
               rent: "₹25,000/month",
               bedrooms: "2BHK",
               area: "1200 sq ft",
+              sourceUrl:
+                result.url || result.sourceURL || "https://example.com", // NEW
+              price: "₹25,000/month", // NEW
               tags: ["apartment", "rental", "chennai"],
             });
           }
@@ -528,7 +562,7 @@ export const scrapeApartmentHunt = action({
           return {
             success: true,
             count: allApartments.length,
-            apartments: allApartments,
+            apartments: allApartments.slice(0, 10),
             source: "search_extracted",
           };
         }
@@ -638,6 +672,12 @@ export const scrapeTechMeetups = action({
                 topic: meetup.topic,
                 type: meetup.type || "Tech Meetup",
                 organizer: meetup.organizer || "Tech Community",
+                sourceUrl:
+                  result.url ||
+                  result.sourceURL ||
+                  "https://gdg.community.dev/gdg-chennai/", // NEW
+                price: "Free", // NEW - most tech meetups are free
+                //contactInfo: meetup.contact || null, // NEW
                 tags: ["tech", "meetup", "chennai", "developer"],
               });
             });
@@ -652,6 +692,10 @@ export const scrapeTechMeetups = action({
               venue: "TBD",
               topic: "Technology",
               type: "Meetup",
+              organizer: "Tech Community", // NEW
+              sourceUrl:
+                result.url || result.sourceURL || "https://example.com", // NEW
+              price: "Free", // NEW
               tags: ["tech", "meetup", "chennai"],
             });
           }
@@ -661,7 +705,7 @@ export const scrapeTechMeetups = action({
           return {
             success: true,
             count: allMeetups.length,
-            meetups: allMeetups,
+            meetups: allMeetups.slice(0, 10),
             source: "search_extracted",
           };
         }
@@ -691,6 +735,9 @@ function generateChennaiRestaurantData() {
       cuisine: "South Indian",
       rating: 4.3,
       priceRange: "₹",
+      sourceUrl: "https://www.zomato.com/chennai/murugan-idli-shop", // NEW
+      price: "₹100-200 per person", // NEW
+      contactInfo: "044-12345678", // NEW
       tags: ["breakfast", "traditional", "vegetarian"],
     },
     {
@@ -700,16 +747,10 @@ function generateChennaiRestaurantData() {
       cuisine: "Indian",
       rating: 4.1,
       priceRange: "₹₹",
+      sourceUrl: "https://www.zomato.com/chennai/buhari-hotel", // NEW
+      price: "₹300-500 per person", // NEW
+      contactInfo: "044-87654321", // NEW
       tags: ["biryani", "historic", "non-vegetarian"],
-    },
-    {
-      title: "Sangeetha Restaurant",
-      description: "Pure vegetarian South Indian meals",
-      location: "Multiple locations",
-      cuisine: "South Indian",
-      rating: 4.2,
-      priceRange: "₹",
-      tags: ["vegetarian", "meals", "traditional"],
     },
   ];
 }
@@ -723,7 +764,42 @@ function generateWeekendEventsData() {
       eventDate: "Dec 2025",
       venue: "Music Academy",
       category: "Music",
+      organizer: "Chennai Music Academy", // NEW
+      ticketPrice: "₹500-2000", // NEW
+      sourceUrl: "https://www.chennaimusic.org/festival", // NEW
+      price: "₹500-2000", // NEW - for AI processor
+      contactInfo: "044-28117162", // NEW
       tags: ["weekend", "event", "chennai"],
+    },
+    {
+      title: "Chennai Book Fair",
+      description:
+        "Annual book fair with thousands of titles and author interactions",
+      location: "Chennai",
+      eventDate: "Jan 2026",
+      venue: "YMCA Nandanam",
+      category: "Literature",
+      organizer: "Booksellers & Publishers Association", // NEW
+      ticketPrice: "₹30 entry", // NEW
+      sourceUrl: "https://www.chennaibookfair.com", // NEW
+      price: "₹30 entry", // NEW
+      contactInfo: "044-24332371", // NEW
+      tags: ["weekend", "event", "chennai", "books"],
+    },
+    {
+      title: "Marina Beach Food Festival",
+      description:
+        "Street food festival featuring Chennai's best local cuisine",
+      location: "Chennai",
+      eventDate: "Weekend in Feb 2026",
+      venue: "Marina Beach",
+      category: "Food",
+      organizer: "Chennai Corporation", // NEW
+      ticketPrice: "Free entry", // NEW
+      sourceUrl: "https://www.chennaicorporation.gov.in/events", // NEW
+      price: "Free entry", // NEW
+      contactInfo: "044-25619111", // NEW
+      tags: ["weekend", "event", "chennai", "food"],
     },
   ];
 }
@@ -732,11 +808,37 @@ function generateLocalNewsData() {
   return [
     {
       title: "Chennai Metro Expansion Update",
-      description: "New metro line construction progress",
+      description:
+        "New metro line construction progress in OMR and Kilpauk corridors",
       category: "Infrastructure",
       location: "Chennai",
       source: "Demo Data",
+      sourceUrl:
+        "https://www.thehindu.com/news/cities/chennai/metro-expansion-update", // NEW
+      publishedTime: "2 hours ago", // NEW
       tags: ["news", "chennai", "local"],
+    },
+    {
+      title: "New IT Park Opens in Sholinganallur",
+      description:
+        "State-of-the-art IT park with capacity for 10,000 employees inaugurated",
+      category: "Business",
+      location: "Chennai",
+      source: "Demo Data",
+      sourceUrl: "https://www.timesofinda.com/chennai/it-park-sholinganallur", // NEW
+      publishedTime: "1 hour ago", // NEW
+      tags: ["news", "chennai", "local", "it"],
+    },
+    {
+      title: "Chennai Traffic Police Launch New Mobile App",
+      description:
+        "Citizens can now pay fines and check vehicle registration through mobile app",
+      category: "Technology",
+      location: "Chennai",
+      source: "Demo Data",
+      sourceUrl: "https://www.newindianexpress.com/chennai-traffic-police-app", // NEW
+      publishedTime: "4 hours ago", // NEW
+      tags: ["news", "chennai", "local", "traffic"],
     },
   ];
 }
@@ -745,12 +847,48 @@ function generateApartmentHuntData() {
   return [
     {
       title: "Modern 2BHK Apartment",
-      description: "Fully furnished apartment in prime location",
+      description:
+        "Fully furnished apartment in prime location with all modern amenities",
       location: "T. Nagar, Chennai",
       rent: "₹25,000/month",
       bedrooms: "2BHK",
       area: "1200 sq ft",
+      amenities: "Gym, Swimming Pool, 24/7 Security, Parking", // NEW
+      sourceUrl: "https://www.99acres.com/rent/2bhk-apartment-t-nagar-chennai", // NEW
+      price: "₹25,000/month", // NEW - for AI processor
+      contactInfo: "9841234567", // NEW
+      furnishing: "Fully Furnished", // NEW
       tags: ["apartment", "rental", "chennai"],
+    },
+    {
+      title: "Spacious 3BHK Villa",
+      description:
+        "Independent villa with garden and parking in quiet residential area",
+      location: "Adyar, Chennai",
+      rent: "₹45,000/month",
+      bedrooms: "3BHK",
+      area: "1800 sq ft",
+      amenities: "Garden, Parking, Power Backup, Water Supply", // NEW
+      sourceUrl: "https://www.magicbricks.com/rent/3bhk-villa-adyar-chennai", // NEW
+      price: "₹45,000/month", // NEW
+      contactInfo: "9876543210", // NEW
+      furnishing: "Semi Furnished", // NEW
+      tags: ["apartment", "rental", "chennai", "villa"],
+    },
+    {
+      title: "Budget 1BHK Near IT Corridor",
+      description:
+        "Affordable apartment perfect for working professionals in OMR",
+      location: "OMR, Chennai",
+      rent: "₹15,000/month",
+      bedrooms: "1BHK",
+      area: "600 sq ft",
+      amenities: "Lift, Security, Parking", // NEW
+      sourceUrl: "https://www.housing.com/rent/1bhk-apartment-omr-chennai", // NEW
+      price: "₹15,000/month", // NEW
+      contactInfo: "8765432109", // NEW
+      furnishing: "Unfurnished", // NEW
+      tags: ["apartment", "rental", "chennai", "budget"],
     },
   ];
 }
@@ -759,12 +897,48 @@ function generateTechMeetupsData() {
   return [
     {
       title: "GDG Chennai Monthly Meetup",
-      description: "Latest in Google technologies and web development",
+      description:
+        "Latest in Google technologies and web development with hands-on workshops",
       location: "Chennai",
       eventDate: "Every first Saturday",
+      venue: "PayPal Office, OMR",
       topic: "Web Development",
       type: "Meetup",
+      organizer: "Google Developer Group Chennai", // NEW
+      sourceUrl: "https://gdg.community.dev/gdg-chennai/", // NEW
+      price: "Free", // NEW - for AI processor
+      contactInfo: "gdgchennai@gmail.com", // NEW
       tags: ["tech", "meetup", "chennai", "developer"],
+    },
+    {
+      title: "React Chennai Meetup",
+      description:
+        "Monthly gathering for React developers to share knowledge and network",
+      location: "Chennai",
+      eventDate: "Every third Saturday",
+      venue: "Zoho Office, Estancia IT Park",
+      topic: "React, Frontend Development",
+      type: "Meetup",
+      organizer: "React Chennai Community", // NEW
+      sourceUrl: "https://www.meetup.com/react-chennai/", // NEW
+      price: "Free", // NEW
+      contactInfo: "reactchennai@gmail.com", // NEW
+      tags: ["tech", "meetup", "chennai", "react", "frontend"],
+    },
+    {
+      title: "Chennai Python User Group",
+      description:
+        "Python enthusiasts gathering for talks, workshops and networking",
+      location: "Chennai",
+      eventDate: "Every second Saturday",
+      venue: "Microsoft Office, RMZ Millenia",
+      topic: "Python, Data Science, AI/ML",
+      type: "User Group",
+      organizer: "Chennai Python User Group", // NEW
+      sourceUrl: "https://www.meetup.com/chennai-python-user-group/", // NEW
+      price: "Free", // NEW
+      contactInfo: "chennaipug@gmail.com", // NEW
+      tags: ["tech", "meetup", "chennai", "python", "data-science"],
     },
   ];
 }

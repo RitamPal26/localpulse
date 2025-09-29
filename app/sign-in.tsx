@@ -16,10 +16,23 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const { data: session, isPending } = authClient.useSession();
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/", // Changed from "/dashboard" to "/" so it goes through your index.tsx logic
+      });
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Google sign in failed");
+      setLoading(false);
+    }
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (session) {
-      router.replace("/(app)/(tabs)");
+      router.replace("/");
     }
   }, [session]);
 
@@ -81,7 +94,7 @@ export default function SignIn() {
           marginBottom: 30,
         }}
       >
-        Welcome Back
+        Welcome Back To ChennaiPulse
       </Text>
 
       <TextInput
@@ -121,14 +134,6 @@ export default function SignIn() {
         onPress={handleLogin}
         disabled={loading}
       />
-
-      <View style={{ marginTop: 15 }}>
-        <Button
-          title={loading ? "Creating Account..." : "Create Account"}
-          onPress={handleSignUp}
-          disabled={loading}
-        />
-      </View>
 
       {/* Optional: Link to dedicated sign-up page */}
       <TouchableOpacity

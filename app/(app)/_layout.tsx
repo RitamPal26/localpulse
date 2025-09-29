@@ -4,9 +4,12 @@ import { authClient } from "../../src/lib/auth-client";
 import { useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { useAutoLogout } from "../../src/hooks/useAutoLogout";
 
 export default function AppLayout() {
   const { data: session, isPending } = authClient.useSession();
+
+  useAutoLogout(2);
 
   // Store user in DB when authenticated
   const storeUser = useMutation(api.users.store);

@@ -19,7 +19,7 @@ export default function SignUp() {
 
   useEffect(() => {
     if (session) {
-      router.replace("/(app)/(tabs)");
+      router.replace("/");
     }
   }, [session]);
 
@@ -62,6 +62,16 @@ export default function SignUp() {
 
   return (
     <View style={{ padding: 20, flex: 1, justifyContent: "center" }}>
+      <Text
+        style={{
+          fontSize: 24,
+          fontWeight: "bold",
+          textAlign: "center",
+          marginBottom: 30,
+        }}
+      >
+        Welcome To ChennaiPulse
+      </Text>
       <Text
         style={{
           fontSize: 24,

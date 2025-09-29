@@ -2,96 +2,6 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 
-export const populateFeedContent = action({
-  args: {},
-  handler: async (ctx) => {
-    console.log("Starting data ingestion pipeline...");
-
-    try {
-      // Step 1: Scrape restaurants (using your working TripAdvisor function)
-      console.log("Scraping restaurants...");
-      const scrapingResult = await ctx.runAction(
-        api.actions.scraper.scrapeChennaiRestaurants, // This stays the same
-        {}
-      );
-
-      if (!scrapingResult.success) {
-        throw new Error(`Scraping failed: ${scrapingResult.error}`);
-      }
-
-      console.log(`Scraped ${scrapingResult.restaurants.length} restaurants`);
-
-      // Step 2: Process each restaurant
-      const processedItems = [];
-
-      for (const restaurant of scrapingResult.restaurants) {
-        try {
-          console.log(`Processing: ${restaurant.title}`);
-
-          // Only enhance with AI - no geocoding needed
-          const aiResult = await ctx.runAction(
-            api.actions.aiProcessor.enhanceWithAI,
-            {
-              title: restaurant.title,
-              description: restaurant.description,
-              contentType: "restaurant",
-              rating: restaurant.rating,
-              cuisine: restaurant.cuisine,
-            }
-          );
-
-          // Prepare data for storage (no coordinates)
-          const contentItem = {
-            pulseId: "restaurants",
-            title: restaurant.title,
-            description: aiResult.aiSummary || restaurant.description,
-            source: "TripAdvisor", // Updated to match your new source
-            sourceUrl:
-              "https://www.tripadvisor.in/Restaurants-g304556-Chennai_Madras_Chennai_District_Tamil_Nadu.html",
-            scrapedAt: Date.now(),
-            location: restaurant.location || "Chennai",
-            contentType: "restaurant",
-            cuisine: restaurant.cuisine,
-            priceRange: restaurant.priceRange,
-            rating: restaurant.rating,
-            aiSummary: aiResult.aiSummary,
-            tags: restaurant.tags || ["restaurant"],
-          };
-
-          // Store in database
-          await ctx.runMutation(api.pulses.addPulseContent, contentItem);
-          processedItems.push(contentItem);
-
-          console.log(`✓ Processed: ${restaurant.title}`);
-
-          // Small delay to avoid overwhelming AI API
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        } catch (error) {
-          console.error(`Error processing ${restaurant.title}:`, error);
-          // Continue with next restaurant
-        }
-      }
-
-      console.log(
-        `Data ingestion completed. Processed ${processedItems.length} items.`
-      );
-
-      return {
-        success: true,
-        processedCount: processedItems.length,
-        items: processedItems,
-      };
-    } catch (error) {
-      console.error("Data ingestion pipeline error:", error);
-      return {
-        success: false,
-        error: error.message,
-        processedCount: 0,
-      };
-    }
-  },
-});
-
 // UPDATED: Complete data ingestion with all 5 categories
 export const populateAllContentTypes = action({
   args: {},
@@ -216,15 +126,19 @@ async function processItems(ctx, items, pulseId, contentType) {
 
   for (const item of items) {
     try {
-      // AI enhance
+      // ENHANCED AI processing with corrected parameters
       const aiResult = await ctx.runAction(
         api.actions.aiProcessor.enhanceWithAI,
         {
           title: item.title,
           description: item.description,
           contentType: contentType,
-          rating: item.rating,
-          cuisine: item.cuisine,
+          sourceUrl: item.sourceUrl || getSourceUrlForType(contentType),
+          eventDate: item.eventDate || undefined, // ✅ Fixed
+          location: item.location || "Chennai",
+          price: item.price || item.rent || undefined, // ✅ Fixed
+          rating: item.rating || undefined, // ✅ Fixed
+          cuisine: item.cuisine || undefined, // ✅ Fixed
         }
       );
 
@@ -234,15 +148,20 @@ async function processItems(ctx, items, pulseId, contentType) {
         title: item.title,
         description: aiResult.aiSummary || item.description,
         source: getSourceForType(contentType),
-        sourceUrl: getSourceUrlForType(contentType),
+        sourceUrl: item.sourceUrl || getSourceUrlForType(contentType), // Keep original URL if available
         scrapedAt: Date.now(),
         location: item.location || "Chennai",
         contentType: contentType,
+        // NEW: Add enhanced AI data
         aiSummary: aiResult.aiSummary,
+        highlights: aiResult.highlights || [],
+        callToAction: aiResult.callToAction || "Learn more!",
+        localContext: aiResult.localContext || "",
+        extractedData: aiResult.extractedData || {},
         tags: item.tags || [contentType],
       };
 
-      // Add type-specific fields
+      // Add type-specific fields (keeping your existing logic)
       let contentItem = { ...baseContent };
 
       if (contentType === "restaurant") {
@@ -283,6 +202,8 @@ async function processItems(ctx, items, pulseId, contentType) {
       processed++;
 
       console.log(`✓ Processed: ${item.title}`);
+      console.log(`  - AI Summary: ${aiResult.aiSummary?.substring(0, 50)}...`);
+      console.log(`  - Highlights: ${aiResult.highlights?.length || 0}`);
 
       // Small delay between items
       await new Promise((resolve) => setTimeout(resolve, 300));

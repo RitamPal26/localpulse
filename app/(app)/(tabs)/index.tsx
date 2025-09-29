@@ -13,61 +13,43 @@ import { api } from "../../../convex/_generated/api";
 import { getPulseById } from "../../../src/constants/pulses";
 import { ShareModal } from "../../../src/components/ShareModal";
 import * as Haptics from "expo-haptics";
-
+import { Link } from "expo-router";
 
 const FeedCard = ({ item, onSave, onShare }) => {
   return (
-    <View style={[styles.card, { borderLeftColor: item.pulseColor }]}>
-      {/* Header */}
-      <View style={styles.cardHeader}>
-        <View style={styles.pulseInfo}>
-          <Text style={styles.pulseIcon}>{item.pulseIcon}</Text>
-          <Text style={styles.pulseName}>
-            {getPulseById(item.pulseId)?.name || item.pulseId}
-          </Text>
+    // 👇 WRAP the card with the Link component
+    <Link href={`/details/${item.id}`} asChild>
+      <TouchableOpacity activeOpacity={0.8}>
+        {/* Your existing card View and all its content goes here */}
+        <View style={[styles.card, { borderLeftColor: item.pulseColor }]}>
+          {/* Header */}
+          <View style={styles.cardHeader}>
+            {/* ... your existing header code */}
+          </View>
+
+          {/* Content */}
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          {/* ... all the rest of your card's content */}
+
+          {/* Actions */}
+          {/* By placing the actions inside the link, their onPress events will still work correctly! */}
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => onSave(item)}
+            >
+              <Text style={styles.actionText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => onShare(item)}
+            >
+              <Text style={styles.actionText}>Share</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.timeAgo}>{item.timeAgo}</Text>
-      </View>
-
-      {/* Content */}
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <Text style={styles.cardDescription}>{item.description}</Text>
-
-      {/* Meta info */}
-      <View style={styles.metaInfo}>
-        <Text style={styles.location}>📍 {item.location}</Text>
-        <Text style={styles.source}>via {item.source}</Text>
-      </View>
-
-      {/* Additional restaurant info */}
-      {item.cuisine && (
-        <View style={styles.additionalInfo}>
-          <Text style={styles.cuisine}>🍽️ {item.cuisine}</Text>
-          {item.rating && (
-            <Text style={styles.rating}>⭐ {item.rating.toFixed(1)}</Text>
-          )}
-          {item.priceRange && (
-            <Text style={styles.priceRange}>{item.priceRange}</Text>
-          )}
-        </View>
-      )}
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => onSave(item)}
-        >
-          <Text style={styles.actionText}>Save</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => onShare(item)}
-        >
-          <Text style={styles.actionText}>Share</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      </TouchableOpacity>
+    </Link>
   );
 };
 
@@ -136,7 +118,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header with stats */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>LocalPulse</Text>
+        <Text style={styles.headerTitle}>ChennaiPulse</Text>
         {contentStats && (
           <Text style={styles.statsText}>
             📊 {contentStats.total} discoveries available

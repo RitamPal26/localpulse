@@ -1,5 +1,26 @@
 import { mutation, query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { Doc } from "./_generated/dataModel";
+
+const mapContentItem = (item: Doc<"pulseContent">) => ({
+    id: item._id,
+    pulseId: item.pulseId,
+    title: item.title,
+    description: item.aiSummary || item.description,
+    source: item.source,
+    sourceUrl: item.sourceUrl,
+    scrapedAt: item.scrapedAt,
+    location: item.location,
+    tags: item.tags,
+    contentType: item.contentType,
+    cuisine: item.cuisine,
+    priceRange: item.priceRange,
+    rating: item.rating,
+    // Add any other fields you want to pass to the frontend
+    pulseIcon: getPulseIcon(item.pulseId),
+    pulseColor: getPulseColor(item.pulseId),
+    timeAgo: getTimeAgo(item.scrapedAt),
+});
 
 // Save user's pulse preferences during onboarding
 export const savePulsePreferences = mutation({
@@ -233,30 +254,49 @@ export const addPulseContent = mutation({
     description: v.string(),
     source: v.string(),
     sourceUrl: v.string(),
-    scrapedAt: v.float64(),  // ← Must be float64, not number
+    scrapedAt: v.float64(),
     location: v.optional(v.string()),
     contentType: v.string(),
     cuisine: v.optional(v.string()),
     priceRange: v.optional(v.string()),
-    rating: v.optional(v.float64()),  // ← Must be float64
+    rating: v.optional(v.float64()),
     eventDate: v.optional(v.string()),
     venue: v.optional(v.string()),
     aiSummary: v.optional(v.string()),
     tags: v.array(v.string()),
-    
-    // ADD ALL THESE MISSING FIELDS:
-    category: v.optional(v.string()), 
+    category: v.optional(v.string()),
     organizer: v.optional(v.string()),
     ticketPrice: v.optional(v.string()),
     publishedTime: v.optional(v.string()),
     rent: v.optional(v.string()),
-    bedrooms: v.optional(v.string()), 
-    area: v.optional(v.string()),     // ← This was missing and causing errors
+    bedrooms: v.optional(v.string()),
+    area: v.optional(v.string()),
     amenities: v.optional(v.string()),
     furnishing: v.optional(v.string()),
+    //contactInfo: v.optional(v.string()),
+
+    // NEW: Add enhanced AI fields
+    highlights: v.optional(v.array(v.string())),
+    callToAction: v.optional(v.string()),
+    localContext: v.optional(v.string()),
+    extractedData: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("pulseContent", args);
+  },
+});
+
+export const getPulseContentById = query({
+  args: {
+    id: v.id("pulseContent"), // Argument is the ID of the document
+  },
+  handler: async (ctx, args) => {
+    const content = await ctx.db.get(args.id);
+    if (!content) {
+      return null;
+    }
+    // Reuse the mapping logic to keep the data shape consistent
+    return mapContentItem(content); 
   },
 });
 
