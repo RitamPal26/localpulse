@@ -29,7 +29,7 @@ export const sendItemShare = action({
     // Call Resend API (now allowed in actions)
     try {
       const emailHtml = generateEmailTemplate({
-        senderName: user.name || "A ChennaiPulse user",
+        senderName: user.name || "A LocalPulse user",
         senderEmail: user.email,
         personalMessage: args.personalMessage,
         itemTitle: args.itemTitle,
@@ -47,7 +47,7 @@ export const sendItemShare = action({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "ChennaiPulse <noreply@resend.dev>", // Use resend.dev for testing
+          from: "LocalPulse <noreply@resend.dev>", // Use resend.dev for testing
           to: [args.friendEmail],
           subject: `${user.name || "Someone"} shared something cool from Chennai with you!`,
           html: emailHtml,
@@ -87,13 +87,13 @@ function generateEmailTemplate(data: {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChennaiPulse Share</title>
+  <title>LocalPulse Share</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   
   <!-- Header -->
   <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #007AFF, #4ECDC4); border-radius: 12px; color: white;">
-    <h1 style="margin: 0; font-size: 24px; font-weight: bold;">ChennaiPulse</h1>
+    <h1 style="margin: 0; font-size: 24px; font-weight: bold;">LocalPulse</h1>
     <p style="margin: 5px 0 0 0; opacity: 0.9;">Discover Chennai's Best</p>
   </div>
 
@@ -134,7 +134,7 @@ function generateEmailTemplate(data: {
   <!-- Call to Action -->
   <div style="text-align: center; margin-bottom: 30px;">
     <a href="https://localpulse.app" style="display: inline-block; background: #007AFF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-      Get ChennaiPulse App
+      Get LocalPulse App
     </a>
     <p style="margin: 12px 0 0 0; font-size: 14px; color: #666;">
       Discover more cool stuff happening in Chennai!
@@ -143,8 +143,8 @@ function generateEmailTemplate(data: {
 
   <!-- Footer -->
   <div style="text-align: center; padding-top: 20px; border-top: 1px solid #eee; color: #999; font-size: 12px;">
-    <p>This email was sent from ChennaiPulse by ${data.senderName} (${data.senderEmail})</p>
-    <p>ChennaiPulse - Your Personal Guide to Chennai</p>
+    <p>This email was sent from LocalPulse by ${data.senderName} (${data.senderEmail})</p>
+    <p>LocalPulse - Your Personal Guide to Chennai</p>
   </div>
 
 </body>

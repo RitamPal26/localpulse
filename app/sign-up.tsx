@@ -70,7 +70,7 @@ export default function SignUp() {
           marginBottom: 30,
         }}
       >
-        Welcome To ChennaiPulse
+        Welcome To LocalPulse
       </Text>
       <Text
         style={{
